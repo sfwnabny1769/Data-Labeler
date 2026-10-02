@@ -44,9 +44,15 @@ class AuditController extends Controller
         $setting = $this->getWorkspaceSetting();
         $sessionPasskey = (string) $request->session()->get('workspace_passkey', '');
 
+        // Audit UI dipakai di dua mode: Fase 0 (preprocess train set) dan Fase 2 (audit hasil labeling).
+        $isAuditMode = in_array($setting->active_activity, [
+            WorkspaceSetting::ACTIVE_PREPROCESS,
+            WorkspaceSetting::ACTIVE_AUDIT,
+        ], true);
+
         return $sessionPasskey !== ''
             && hash_equals((string) $setting->access_passkey, $sessionPasskey)
-            && $setting->active_activity === WorkspaceSetting::ACTIVE_AUDIT;
+            && $isAuditMode;
     }
 
     private function deniedAuditResponse(Request $request, string $message)
@@ -59,6 +65,57 @@ class AuditController extends Controller
     }
 
     /**
+     * Daftar key kelas valid untuk relabel_to / round2_decision.
+     * Format: "{id}_{name}" — dinamis dari config('competition.classes').
+     * Contoh untuk kompetisi sampah: "0_Aman", "1_Rusak", "2_Lainnya".
+     */
+    private function getValidRelabelOptions(): array
+    {
+        $classes = config('competition.classes', []);
+
+        $options = [];
+        foreach ($classes as $class) {
+            $id = (string) ($class['id'] ?? '');
+            $name = (string) ($class['name'] ?? '');
+            if ($id !== '' && $name !== '') {
+                $options[] = $id . '_' . $name;
+            }
+        }
+
+        // Fallback kalau config kosong: pakai CLASS_OPTIONS lama
+        if (empty($options)) {
+            $options = array_keys(AuditCandidate::CLASS_OPTIONS);
+        }
+
+        return $options;
+    }
+
+    /**
+     * Daftar opsi kelas untuk ditampilkan di view (label + key).
+     * Dipakai audit_relabel.blade.php & audit.blade.php popup A.
+     */
+    private function getClassOptionsForView(): array
+    {
+        $classes = config('competition.classes', []);
+
+        $options = [];
+        foreach ($classes as $class) {
+            $id = (string) ($class['id'] ?? '');
+            $name = (string) ($class['name'] ?? '');
+            if ($id !== '' && $name !== '') {
+                $key = $id . '_' . $name;
+                $options[$key] = $name . ' (' . ($class['badge'] ?? ('Label: ' . $id)) . ')';
+            }
+        }
+
+        if (empty($options)) {
+            $options = AuditCandidate::CLASS_OPTIONS;
+        }
+
+        return $options;
+    }
+
+    /**
      * Halaman putaran 1: tinjau kandidat, putuskan A/B/C/D.
      */
     public function index(Request $request)
@@ -67,10 +124,14 @@ class AuditController extends Controller
             return redirect()->route('home')->with('error', 'Workspace audit belum aktif atau passkey sudah tidak valid.');
         }
 
+        $setting = $this->getWorkspaceSetting();
+
         return view('audit', [
             'nickname' => $request->session()->get('nickname'),
             'prodi' => $request->session()->get('prodi'),
             'rubric' => AuditCandidate::ROUND1_RUBRIC,
+            'classOptions' => $this->getClassOptionsForView(),
+            'activeActivity' => $setting->active_activity,
         ]);
     }
 
@@ -86,7 +147,7 @@ class AuditController extends Controller
         return view('audit_relabel', [
             'nickname' => $request->session()->get('nickname'),
             'prodi' => $request->session()->get('prodi'),
-            'classOptions' => AuditCandidate::CLASS_OPTIONS,
+            'classOptions' => $this->getClassOptionsForView(),
             'contaminationDecision' => AuditCandidate::CONTAMINATION_DECISION,
         ]);
     }
@@ -179,10 +240,12 @@ class AuditController extends Controller
 
         $nickname = $request->session()->get('nickname');
 
+        $validRelabelOptions = $this->getValidRelabelOptions();
+
         $request->validate([
             'candidate_id' => 'required|exists:audit_candidates,id',
             'decision' => 'required|in:A,B,C,D',
-            'relabel_to' => 'nullable|required_if:decision,A|in:0_Recyclable,1_Electronic,2_Organic',
+            'relabel_to' => 'nullable|required_if:decision,A|in:' . implode(',', $validRelabelOptions),
             'note' => 'nullable|string|max:500',
         ]);
 
@@ -323,7 +386,7 @@ class AuditController extends Controller
 
         $nickname = $request->session()->get('nickname');
 
-        $validOptions = array_merge(array_keys(AuditCandidate::CLASS_OPTIONS), [AuditCandidate::CONTAMINATION_DECISION]);
+        $validOptions = array_merge($this->getValidRelabelOptions(), [AuditCandidate::CONTAMINATION_DECISION]);
 
         $request->validate([
             'candidate_id' => 'required|exists:audit_candidates,id',
@@ -365,26 +428,14 @@ class AuditController extends Controller
     }
 
     /**
-     * Admin: dashboard audit -- stats, upload CSV kandidat, upload ZIP gambar train, unduh hasil.
+     * @deprecated Panel audit sudah dilebur ke halaman admin utama
+     *             (resources/views/admin.blade.php + admin/partials/preprocess.blade.php).
+     *             Route /admin/audit sekarang hanya redirect ke /admin.
+     *             Metode ini dipertahankan sebagai pengaman bila ada pemanggilan internal.
      */
     public function adminView(Request $request)
     {
-        if (!$request->session()->has('admin_authenticated')) {
-            return redirect()->route('admin');
-        }
-
-        $stats = [
-            'total' => AuditCandidate::count(),
-            'round1_pending' => AuditCandidate::whereNull('round1_decision')->count(),
-            'round1_by_decision' => AuditCandidate::whereNotNull('round1_decision')
-                ->select('round1_decision', DB::raw('count(*) as total'))
-                ->groupBy('round1_decision')
-                ->pluck('total', 'round1_decision'),
-            'round2_pending' => AuditCandidate::where('round1_decision', 'A')->whereNull('round2_decision')->count(),
-            'round2_done' => AuditCandidate::where('round1_decision', 'A')->whereNotNull('round2_decision')->count(),
-        ];
-
-        return view('admin_audit', compact('stats'));
+        return redirect()->route('admin');
     }
 
     /**
@@ -423,7 +474,6 @@ class AuditController extends Controller
         }
 
         $imported = 0;
-        $skipped = 0;
         while (($row = fgetcsv($handle)) !== false) {
             $filepath = str_replace('\\', '/', $row[$col['filepath']]);
             $filename = basename($filepath);
@@ -432,15 +482,10 @@ class AuditController extends Controller
                 $priorityScore = (float) $row[$col['priority_score']];
                 $conflictRate = (float) $row[$col['neighbor_conflict_rate']];
                 $outlierScore = (float) $row[$col['hdbscan_outlier_score']];
-                $isCloserToOther = isset($col['is_closer_to_other']) && strtolower(trim($row[$col['is_closer_to_other']])) === 'true';
 
-                // FILTER: Hanya masukkan jika mencurigakan (conflict >= 20%, outlier >= 0.5, atau lebih dekat ke kelas lain)
-                $isSuspicious = ($conflictRate >= 0.2) || ($outlierScore >= 0.5) || $isCloserToOther;
-                
-                if (!$isSuspicious) {
-                    $skipped++;
-                    continue;
-                }
+                // SEMUA gambar masuk antrian review (bukan cuma yang di-flag),
+                // tapi urutan antrian tetap berdasarkan priority_score di getNextCandidate.
+                // Gambar yang tidak flag akan dapat priority_score rendah otomatis.
 
                 AuditCandidate::updateOrCreate(
                     ['filename' => $filename],
@@ -458,18 +503,21 @@ class AuditController extends Controller
             } else {
                 // Skema lama Cleanlab
                 $flagged = strtolower(trim($row[$col['is_flagged_label_issue']])) === 'true';
-                if (!$flagged) {
-                    $skipped++;
-                    continue;
-                }
+                $qualityScore = (float) $row[$col['label_quality_score']];
+
+                // SEMUA gambar masuk antrian review (bukan cuma yang di-flag).
+                // Yang di-flag dapat priority_score tinggi (1 - quality),
+                // yang tidak di-flag dapat priority_score rendah (0.0) supaya
+                // tetap muncul di antrian tapi di urutan belakang.
+                $priorityScore = $flagged ? (1.0 - $qualityScore) : 0.0;
 
                 AuditCandidate::updateOrCreate(
                     ['filename' => $filename],
                     [
                         'given_label' => $row[$col['given_label']],
                         'predicted_label' => $row[$col['predicted_label']],
-                        'label_quality_score' => (float) $row[$col['label_quality_score']],
-                        'priority_score' => 1.0 - (float) $row[$col['label_quality_score']],
+                        'label_quality_score' => $qualityScore,
+                        'priority_score' => $priorityScore,
                     ]
                 );
             }
@@ -477,7 +525,7 @@ class AuditController extends Controller
         }
         fclose($handle);
 
-        return back()->with('success', "Berhasil impor {$imported} kandidat dari CSV ({$skipped} baris dilewati karena tidak di-flag).");
+        return back()->with('success', "Berhasil impor {$imported} kandidat dari CSV (semua gambar dimasukkan ke antrian, urut berdasarkan prioritas flag).");
     }
 
     /**
