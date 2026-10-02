@@ -219,17 +219,33 @@
                         @endforeach
                     </div>
 
-                    <button
-                        type="button"
-                        onclick="skipImage()"
-                        class="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-slate-800/70 hover:bg-slate-700/80 border border-slate-700 hover:border-slate-600 rounded-2xl text-xs font-semibold text-slate-300 transition-all duration-200 active:scale-[0.99] cursor-pointer nb-skip"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M4 12h16" />
-                        </svg>
-                        Lewati Gambar
-                        <span class="text-[10px] text-slate-500">(S)</span>
-                    </button>
+                    <div class="w-full mt-4 flex flex-col sm:flex-row items-stretch gap-3 nb-action-row">
+                        <button
+                            type="button"
+                            onclick="undoLastLabel()"
+                            id="undo-last-btn"
+                            class="flex-1 flex items-center justify-center gap-2 p-3 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 rounded-2xl text-xs font-semibold transition-all duration-200 active:scale-[0.99] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-amber-500/10 nb-undo"
+                            title="Batalkan label terakhir yang salah pilih, lalu tampilkan lagi gambarnya"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                            </svg>
+                            <span id="undo-last-label">Koreksi Label Terakhir</span>
+                            <span class="text-[10px] text-amber-400/70 font-mono">(Z)</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onclick="skipImage()"
+                            class="flex-1 flex items-center justify-center gap-2 p-3 bg-slate-800/70 hover:bg-slate-700/80 border border-slate-700 hover:border-slate-600 rounded-2xl text-xs font-semibold text-slate-300 transition-all duration-200 active:scale-[0.99] cursor-pointer nb-skip"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M4 12h16" />
+                            </svg>
+                            Lewati Gambar
+                            <span class="text-[10px] text-slate-500">(S)</span>
+                        </button>
+                    </div>
                 </div>
 
             </div>
@@ -327,10 +343,19 @@
         let isProcessingOutbox = false;
         let isBufferExhausted = false;
 
+        // Riwayat label terakhir milik user (untuk fitur "Koreksi Label Terakhir").
+        // Maksimal 20 entri supaya tidak membengkak di memori.
+        const MAX_UNDO_HISTORY = 20;
+        let labelHistory = [];
+
+        // Kunci saat request undo berjalan supaya tidak dobel klik.
+        let isUndoing = false;
+
         document.addEventListener('DOMContentLoaded', () => {
             // Initial buffer load
             replenishBuffer(true);
             updateLeaderboard();
+            updateUndoButton();
 
             // Periodic Leaderboard & Heartbeat
             setInterval(updateLeaderboard, 5000);
@@ -373,6 +398,12 @@
 
                 if (e.key === 's' || e.key === 'S') {
                     skipImage();
+                    return;
+                }
+
+                // Z = koreksi label terakhir (undo).
+                if (e.key === 'z' || e.key === 'Z') {
+                    undoLastLabel();
                     return;
                 }
 
@@ -452,6 +483,22 @@
         }
 
         /**
+         * Tampilkan satu item ke frame gambar (double buffering, tanpa white flash).
+         */
+        function renderActiveItem(item) {
+            const currentSlot = activeSlot;
+            const nextSlot = (currentSlot === 'a' ? 'b' : 'a');
+            activeSlot = nextSlot;
+
+            const currentEl = document.getElementById(`target-image-${currentSlot}`);
+            const nextEl = document.getElementById(`target-image-${nextSlot}`);
+
+            nextEl.src = item.url;
+            nextEl.style.opacity = '1';
+            currentEl.style.opacity = '0';
+        }
+
+        /**
          * Switch instantly to the next image in the local buffer (0ms delay).
          */
         function advanceToNext() {
@@ -468,17 +515,7 @@
             activeItem = nextItem;
             updateBufferBadge();
 
-            // Double buffering switch: Swap image elements without white flash
-            const currentSlot = activeSlot;
-            const nextSlot = (currentSlot === 'a' ? 'b' : 'a');
-            activeSlot = nextSlot;
-
-            const currentEl = document.getElementById(`target-image-${currentSlot}`);
-            const nextEl = document.getElementById(`target-image-${nextSlot}`);
-
-            nextEl.src = nextItem.url;
-            nextEl.style.opacity = '1';
-            currentEl.style.opacity = '0';
+            renderActiveItem(nextItem);
 
             showLoader(false);
             showCompleteScreen(false);
@@ -514,7 +551,149 @@
                 attempts: 0
             });
 
+            // 4. Simpan riwayat supaya label salah bisa dikoreksi sendiri
+            recordLabelHistory(itemToSubmit, labelValue);
+
             processOutbox();
+        }
+
+        /**
+         * Catat label terakhir agar bisa dibatalkan oleh user (tombol "Koreksi").
+         */
+        function recordLabelHistory(item, labelValue) {
+            labelHistory.push({
+                id: item.id,
+                filename: item.filename,
+                url: item.url,
+                imgObj: item.imgObj || null,
+                label: labelValue,
+                submitted_at: Date.now()
+            });
+
+            if (labelHistory.length > MAX_UNDO_HISTORY) {
+                labelHistory.shift();
+            }
+
+            updateUndoButton();
+        }
+
+        /**
+         * Update tampilan tombol koreksi sesuai isi riwayat.
+         */
+        function updateUndoButton() {
+            const btn = document.getElementById('undo-last-btn');
+            const labelEl = document.getElementById('undo-last-label');
+            if (!btn || !labelEl) return;
+
+            const last = labelHistory[labelHistory.length - 1];
+
+            if (!last) {
+                btn.disabled = true;
+                labelEl.textContent = 'Koreksi Label Terakhir';
+                btn.title = 'Belum ada label yang perlu dikoreksi.';
+                return;
+            }
+
+            const cls = COMPETITION_CLASSES.find(c => c.id === last.label);
+            const clsName = cls ? `${cls.id} - ${cls.name}` : `label ${last.label}`;
+
+            btn.disabled = false;
+            labelEl.textContent = `Koreksi: ${clsName}`;
+            btn.title = `Batalkan label "${clsName}" untuk ${last.filename}, lalu tampilkan gambar itu lagi.`;
+        }
+
+        /**
+         * Batalkan label terakhir milik user, lalu tampilkan kembali gambarnya
+         * supaya bisa langsung dipilih label yang benar.
+         *
+         * Hanya bisa dipakai selama label belum divalidasi admin.
+         */
+        async function undoLastLabel() {
+            if (isUndoing) return;
+
+            const last = labelHistory[labelHistory.length - 1];
+            if (!last) {
+                showAlert('Belum ada label yang bisa dikoreksi.', 'warning');
+                return;
+            }
+
+            // Kalau outbox masih Antrian (belum terkirim), cukup buang dari antrean.
+            const queuedIndex = outboxQueue.findIndex(q => q.image_id === last.id);
+            const stillQueued = queuedIndex !== -1 && !isProcessingOutbox;
+
+            if (stillQueued) {
+                outboxQueue.splice(queuedIndex, 1);
+                finalizeUndo(last, null);
+                return;
+            }
+
+            isUndoing = true;
+            const btn = document.getElementById('undo-last-btn');
+            if (btn) btn.disabled = true;
+
+            try {
+                const response = await axios.post('{{ route("api.undo-label") }}', {
+                    image_id: last.id
+                });
+
+                finalizeUndo(last, response.data);
+            } catch (err) {
+                const message = (err.response && err.response.data && err.response.data.error)
+                    ? err.response.data.error
+                    : 'Gagal membatalkan label. Coba lagi.';
+                showAlert(message, 'danger');
+            } finally {
+                isUndoing = false;
+                updateUndoButton();
+            }
+        }
+
+        /**
+         * Selesaikan pembatalan label: kembalikan gambar ke frame dan
+         * kembalikan statistik kontribusi user.
+         */
+        function finalizeUndo(last, serverResponse) {
+            // Buang entri riwayat (paling recent).
+            const idx = labelHistory.findIndex(h => h.id === last.id && h.submitted_at === last.submitted_at);
+            if (idx !== -1) {
+                labelHistory.splice(idx, 1);
+            }
+
+            // Kembalikan gambar yang sedang tampil ke depan buffer supaya
+            // user tidak kehilangan urutan antrean.
+            if (activeItem) {
+                imageBuffer.unshift(activeItem);
+            }
+
+            // Tampilkan kembali gambar yang salah dilabel.
+            activeItem = {
+                id: last.id,
+                filename: last.filename,
+                url: last.url,
+                imgObj: last.imgObj
+            };
+
+            renderActiveItem(activeItem);
+            updateBufferBadge();
+            showLoader(false);
+            showCompleteScreen(false);
+
+            // Turunkan counter kontribusi user secara optimistis.
+            const userStatEl = document.getElementById('stat-user');
+            if (userStatEl) {
+                const currentVal = parseInt(userStatEl.textContent.replace(/\D/g, '')) || 0;
+                userStatEl.textContent = formatNumber(Math.max(0, currentVal - 1));
+            }
+
+            // Sinkronkan ulang angka total dari server.
+            replenishBuffer();
+
+            const cls = COMPETITION_CLASSES.find(c => c.id === last.label);
+            const clsName = cls ? `${cls.id} - ${cls.name}` : `label ${last.label}`;
+            showAlert(`Label "${clsName}" dibatalkan. Gambar ditampilkan lagi, silakan pilih label yang benar.`, 'warning');
+
+            updateLeaderboard();
+            updateUndoButton();
         }
 
         /**

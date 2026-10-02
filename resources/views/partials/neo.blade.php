@@ -744,14 +744,31 @@
             margin-top: 2px !important;
         }
 
-        body.app-labeler #label-controls .nb-skip {
+        body.app-labeler #label-controls .nb-action-row {
             margin-top: 0.4rem !important;
+            gap: 0.4rem !important;
+        }
+
+        body.app-labeler #label-controls .nb-undo,
+        body.app-labeler #label-controls .nb-skip {
+            margin-top: 0 !important;
             padding-top: 0.4rem !important;
             padding-bottom: 0.4rem !important;
             font-size: 10px !important;
             border-width: 2px !important;
             border-radius: 10px !important;
             box-shadow: 3px 3px 0 var(--nb-ink) !important;
+        }
+
+        body.app-labeler #label-controls .nb-undo svg,
+        body.app-labeler #label-controls .nb-skip svg {
+            width: 0.85rem !important;
+            height: 0.85rem !important;
+        }
+
+        body.app-labeler #label-controls .nb-undo:disabled {
+            box-shadow: none !important;
+            border-color: var(--nb-ink) !important;
         }
 
         /* Kolom kanan: pedoman tetap, leaderboard mengisi sisa tinggi */

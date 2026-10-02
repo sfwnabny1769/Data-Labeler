@@ -442,4 +442,225 @@ class MultiLabelerConsensusTest extends TestCase
         $this->assertSame(2, (int) $image->label);
         $this->assertDatabaseCount('image_labels', 0);
     }
+
+    /*
+    |=====================================================================
+    | FITUR: Koreksi Label Terakhir (undo) di halaman labeler
+    |=====================================================================
+    */
+
+    private function enableSingleLabeler(): WorkspaceSetting
+    {
+        return WorkspaceSetting::create([
+            'active_activity' => WorkspaceSetting::ACTIVE_LABELING,
+            'access_passkey' => 'TESTPASS123',
+            'multi_labeler_mode' => false,
+        ]);
+    }
+
+    /** Single-labeler: undo mengembalikan gambar ke pool 'unlabeled'. */
+    public function test_undo_last_label_resets_pending_label(): void
+    {
+        $this->enableSingleLabeler();
+        $image = $this->makeImage();
+
+        $this->withSession($this->userSession('UserA'))
+            ->postJson(route('api.submit-label'), ['image_id' => $image->id, 'label' => 1])
+            ->assertJson(['success' => true]);
+
+        $this->withSession($this->userSession('UserA'))
+            ->postJson(route('api.undo-label'), ['image_id' => $image->id])
+            ->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $image->refresh();
+        $this->assertSame('unlabeled', $image->label_status);
+        $this->assertNull($image->label);
+        $this->assertNull($image->labeled_by);
+
+        // Lease langsung dipegang user yang sama, jadi tim lain tidak mengambil
+        // gambar itu selagi ia masih memilih label yang benar.
+        $this->assertSame('UserA', $image->reserved_by);
+        $this->assertTrue($image->reserved_until->isFuture());
+    }
+
+    /** Label milik orang lain tidak boleh bisa dibatalkan. */
+    public function test_undo_last_label_rejects_other_users_label(): void
+    {
+        $this->enableSingleLabeler();
+        $image = $this->makeImage();
+        $image->update([
+            'label' => 0,
+            'label_status' => 'pending',
+            'labeled_by' => 'UserB',
+            'prodi' => 'Informatika',
+        ]);
+
+        $this->withSession($this->userSession('UserA'))
+            ->postJson(route('api.undo-label'), ['image_id' => $image->id])
+            ->assertStatus(409);
+
+        $image->refresh();
+        $this->assertSame('pending', $image->label_status);
+        $this->assertSame(0, (int) $image->label);
+    }
+
+    /** Kalau sudah divalidasi admin, undo harus ditolak dengan pesan jelas. */
+    public function test_undo_last_label_rejected_after_admin_approval(): void
+    {
+        $this->enableSingleLabeler();
+        $image = $this->makeImage();
+        $image->update([
+            'label' => 2,
+            'label_status' => 'approved',
+            'labeled_by' => 'UserA',
+            'prodi' => 'Informatika',
+        ]);
+
+        $this->withSession($this->userSession('UserA'))
+            ->postJson(route('api.undo-label'), ['image_id' => $image->id])
+            ->assertStatus(409);
+
+        $image->refresh();
+        $this->assertSame('approved', $image->label_status);
+        $this->assertSame(2, (int) $image->label);
+    }
+
+    /** Multi-labeler: undo hanya menghapus suara user itu sendiri. */
+    public function test_undo_last_label_removes_only_own_vote_in_multi_labeler(): void
+    {
+        $this->enableMultiLabeler(2);
+        $image = $this->makeImage();
+
+        $this->withSession($this->userSession('UserA'))
+            ->postJson(route('api.submit-label'), ['image_id' => $image->id, 'label' => 1])
+            ->assertStatus(200);
+
+        $this->withSession($this->userSession('UserA'))
+            ->postJson(route('api.undo-label'), ['image_id' => $image->id])
+            ->assertStatus(200);
+
+        $this->assertDatabaseCount('image_labels', 0);
+
+        $image->refresh();
+        $this->assertSame('unlabeled', $image->label_status);
+
+        // UserA boleh memilih ulang karena suaranya sudah dihapus.
+        $this->withSession($this->userSession('UserA'))
+            ->postJson(route('api.submit-label'), ['image_id' => $image->id, 'label' => 2])
+            ->assertStatus(200);
+
+        $image->refresh();
+        $this->assertSame('collecting', $image->label_status);
+        $this->assertSame(2, (int) ImageLabel::where('image_id', $image->id)->first()->label);
+    }
+
+    /** Halaman labeler harus punya tombol koreksi. */
+    public function test_labeler_page_exposes_undo_control(): void
+    {
+        $this->enableSingleLabeler();
+
+        $response = $this->withSession($this->userSession('UserA'))->get(route('home'));
+        $response->assertOk();
+
+        $response->assertSee('undoLastLabel', false);
+        $response->assertSee('undo-last-btn', false);
+        $response->assertSee('nb-undo', false);
+        $response->assertSee(route('api.undo-label'), false);
+        $response->assertSee('Koreksi Label Terakhir', false);
+    }
+
+    /*
+    |=====================================================================
+    | FITUR: Sorting tabel validasi admin (waktu / nama)
+    |=====================================================================
+    */
+
+    /** Urut berdasarkan nama file harus benar-benar mengubah urutan baris. */
+    public function test_admin_pending_table_can_be_sorted_by_name(): void
+    {
+        $this->enableSingleLabeler();
+
+        Image::create(['filename' => 'zzz_last.jpg', 'label' => 0, 'label_status' => 'pending', 'labeled_by' => 'UserA']);
+        Image::create(['filename' => 'aaa_first.jpg', 'label' => 1, 'label_status' => 'pending', 'labeled_by' => 'UserB']);
+
+        $asc = $this->withSession(['admin_authenticated' => true])
+            ->get(route('admin', ['sort_pending' => 'name_asc']));
+
+        $asc->assertOk();
+        $this->assertSame('aaa_first.jpg', $asc->viewData('pendingItems')->first()->filename);
+        $this->assertSame('name_asc', $asc->viewData('pendingSort'));
+
+        $desc = $this->withSession(['admin_authenticated' => true])
+            ->get(route('admin', ['sort_pending' => 'name_desc']));
+
+        $desc->assertOk();
+        $this->assertSame('zzz_last.jpg', $desc->viewData('pendingItems')->first()->filename);
+    }
+
+    /** Urut berdasarkan waktu (updated_at) untuk kedua tabel. */
+    public function test_admin_tables_can_be_sorted_by_time(): void
+    {
+        $this->enableSingleLabeler();
+
+        $old = Image::create(['filename' => 'old.jpg', 'label' => 0, 'label_status' => 'pending', 'labeled_by' => 'UserA']);
+        $old->forceFill(['updated_at' => now()->subDays(3), 'created_at' => now()->subDays(3)])->save();
+
+        $new = Image::create(['filename' => 'new.jpg', 'label' => 1, 'label_status' => 'pending', 'labeled_by' => 'UserB']);
+        $new->forceFill(['updated_at' => now(), 'created_at' => now()])->save();
+
+        // Pending: "lama -> baru" -> yang lama dulu.
+        $oldest = $this->withSession(['admin_authenticated' => true])->get(route('admin', ['sort_pending' => 'oldest']));
+        $oldest->assertOk();
+        $this->assertSame('old.jpg', $oldest->viewData('pendingItems')->first()->filename);
+        $this->assertSame('oldest', $oldest->viewData('pendingSort'));
+
+        // Pending: "baru -> lama" -> yang baru dulu.
+        $newest = $this->withSession(['admin_authenticated' => true])->get(route('admin', ['sort_pending' => 'newest']));
+        $newest->assertOk();
+        $this->assertSame('new.jpg', $newest->viewData('pendingItems')->first()->filename);
+
+        // Approved default-nya "baru -> lama".
+        // Catatan: update() menyetel ulang updated_at, jadi waktu harus di-set ulang manual.
+        $old->update(['label_status' => 'approved']);
+        $old->forceFill(['updated_at' => now()->subDays(3)])->save();
+
+        $new->update(['label_status' => 'approved']);
+        $new->forceFill(['updated_at' => now()])->save();
+
+        $approved = $this->withSession(['admin_authenticated' => true])->get(route('admin'));
+        $approved->assertOk();
+        $this->assertSame('newest', $approved->viewData('approvedSort'));
+        $this->assertSame('new.jpg', $approved->viewData('approvedItems')->first()->filename);
+    }
+
+    /** Nilai sort ngawur harus jatuh ke default, bukan error / SQL injection. */
+    public function test_admin_sort_falls_back_to_default_on_invalid_value(): void
+    {
+        $this->enableSingleLabeler();
+
+        Image::create(['filename' => 'a.jpg', 'label' => 0, 'label_status' => 'pending', 'labeled_by' => 'UserA']);
+
+        $response = $this->withSession(['admin_authenticated' => true])
+            ->get(route('admin', ['sort_pending' => 'filename; DROP TABLE images']));
+
+        $response->assertOk();
+        $this->assertSame('oldest', $response->viewData('pendingSort'));
+        $this->assertDatabaseCount('images', 1);
+    }
+
+    /** Dropdown sortir harus benar-benar dirender di kedua tabel. */
+    public function test_admin_sort_controls_are_rendered(): void
+    {
+        $this->enableSingleLabeler();
+
+        $response = $this->withSession(['admin_authenticated' => true])->get(route('admin'));
+
+        $response->assertOk();
+        $response->assertSee('name="sort_pending"', false);
+        $response->assertSee('name="sort_approved"', false);
+        $response->assertSee('Urut: Waktu (lama → baru)', false);
+        $response->assertSee('Urut: Nama file (A → Z)', false);
+        $response->assertSee('Urut: Nama labeler (A → Z)', false);
+    }
 }

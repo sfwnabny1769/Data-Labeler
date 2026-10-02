@@ -17,6 +17,7 @@ Route::get('/api/images/batch', [DatasetController::class, 'getBatchImages'])->n
 Route::post('/api/images/release-lease', [DatasetController::class, 'releaseLease'])->name('api.release-lease');
 Route::post('/api/images/heartbeat', [DatasetController::class, 'heartbeatLease'])->name('api.heartbeat-lease');
 Route::post('/api/submit-label', [DatasetController::class, 'submitLabel'])->name('api.submit-label');
+Route::post('/api/undo-label', [DatasetController::class, 'undoLastLabel'])->name('api.undo-label');
 Route::get('/api/leaderboard', [DatasetController::class, 'getLeaderboard'])->name('api.leaderboard');
 
 // Admin routes

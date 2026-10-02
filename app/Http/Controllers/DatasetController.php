@@ -16,6 +16,25 @@ use ZipArchive;
 
 class DatasetController extends Controller
 {
+    /**
+     * Opsi pengurutan tabel validasi admin.
+     * key => [kolom, arah default]
+     */
+    private const VALIDATION_SORTS = [
+        'oldest'    => ['updated_at', 'asc'],
+        'newest'    => ['updated_at', 'desc'],
+        'name_asc'  => ['filename', 'asc'],
+        'name_desc' => ['filename', 'desc'],
+        'labeler'   => ['labeled_by', 'asc'],
+    ];
+
+    private function resolveSort(?string $sort, string $fallback): array
+    {
+        $sort = in_array($sort, array_keys(self::VALIDATION_SORTS), true) ? $sort : $fallback;
+
+        return [$sort, self::VALIDATION_SORTS[$sort][0], self::VALIDATION_SORTS[$sort][1]];
+    }
+
     private function getWorkspaceSetting(): WorkspaceSetting
     {
         $setting = WorkspaceSetting::query()->first();
@@ -593,6 +612,128 @@ class DatasetController extends Controller
     }
 
     /**
+     * Batalkan label terakhir milik user yang sedang login.
+     *
+     * Dipakai labeler ketika salah menekan tombol label dan ingin
+     * memperbaikinya sendiri tanpa harus minta admin. Label hanya bisa
+     * dibatalkan selama belum divalidasi admin (status masih 'pending').
+     *
+     * Mode single-labeler  -> label dikosongkan, gambar balik ke pool.
+     * Mode multi-labeler   -> suara user dihapus dari image_labels,
+     *                         lalu status dihitung ulang (collecting /
+     *                         consensus / dispute).
+     */
+    public function undoLastLabel(Request $request)
+    {
+        if (!$this->isWorkspaceAccessValid($request, WorkspaceSetting::ACTIVE_LABELING)) {
+            return $this->deniedWorkspaceResponse($request, 'Workspace labeling belum aktif atau passkey sudah tidak valid.');
+        }
+
+        $nickname = (string) $request->session()->get('nickname');
+
+        $request->validate([
+            'image_id' => 'required|exists:images,id',
+        ]);
+
+        $imageId = $request->input('image_id');
+        $required = max(1, (int) config('competition.required_labelers', 2));
+        $multiLabeler = (bool) $this->getWorkspaceSetting()->multi_labeler_mode;
+
+        $result = DB::transaction(function () use ($imageId, $nickname, $multiLabeler, $required) {
+            $image = Image::where('id', $imageId)->lockForUpdate()->first();
+
+            if (!$image) {
+                return ['ok' => false, 'reason' => 'not_found'];
+            }
+
+            if ($multiLabeler) {
+                // Hapus suara user ini saja; suara labeler lain tetap utuh.
+                $deleted = ImageLabel::where('image_id', $image->id)
+                    ->where('labeled_by', $nickname)
+                    ->delete();
+
+                if ($deleted === 0) {
+                    return ['ok' => false, 'reason' => $image->label_status === 'approved' ? 'already_approved' : 'not_owned'];
+                }
+
+                $votes = ImageLabel::where('image_id', $image->id)->get();
+                $distinctLabels = $votes->pluck('label')->unique();
+
+                $image->label = null;
+                $image->labeled_by = $votes->pluck('labeled_by')->implode(', ');
+                $image->prodi = $votes->pluck('prodi')->filter()->implode(', ');
+                $image->dispute_note = null;
+
+                if ($votes->count() >= $required) {
+                    if ($distinctLabels->count() === 1) {
+                        $image->label = $distinctLabels->first();
+                        $image->label_status = 'approved';
+                    } else {
+                        $image->label_status = 'dispute';
+                    }
+                } elseif ($votes->count() > 0) {
+                    $image->label_status = 'collecting';
+                } else {
+                    $image->label_status = 'unlabeled';
+                    $image->labeled_by = null;
+                    $image->prodi = null;
+                }
+
+                $image->reserved_by = null;
+                $image->reserved_until = null;
+                $image->save();
+
+                return ['ok' => true, 'multi' => true, 'status' => $image->label_status, 'votes' => $votes->count()];
+            }
+
+            // Single labeler: hanya boleh membatalkan label miliknya sendiri
+            // yang belum divalidasi admin.
+            if ($image->label_status !== 'pending') {
+                return ['ok' => false, 'reason' => $image->label_status === 'unlabeled' ? 'already_undone' : 'already_approved'];
+            }
+
+            if ($image->labeled_by !== $nickname) {
+                return ['ok' => false, 'reason' => 'not_owned'];
+            }
+
+            // Gambar dikembalikan ke pool, tapi lease-nya langsung dipegang lagi
+            // oleh user yang sama supaya tidak diambil anggota tim lain
+            // selagi ia sedang memilih label yang benar.
+            $leaseMinutes = (int) config('competition.lease_duration_minutes', 3);
+
+            $image->update([
+                'label' => null,
+                'labeled_by' => null,
+                'prodi' => null,
+                'label_status' => 'unlabeled',
+                'reserved_by' => $nickname,
+                'reserved_until' => now()->addMinutes($leaseMinutes),
+            ]);
+
+            return ['ok' => true, 'multi' => false];
+        });
+
+        if (!$result['ok']) {
+            $messages = [
+                'not_found' => 'Gambar tidak ditemukan.',
+                'not_owned' => 'Label terakhir ini bukan milikmu, tidak bisa dibatalkan.',
+                'already_approved' => 'Label ini sudah divalidasi admin. Minta admin untuk memperbaikinya.',
+                'already_undone' => 'Label ini sudah dikosongkan.',
+            ];
+
+            return response()->json([
+                'error' => $messages[$result['reason']] ?? 'Label tidak bisa dibatalkan.',
+            ], 409);
+        }
+
+        return response()->json([
+            'success' => true,
+            'multi_labeler' => !empty($result['multi']),
+            'status' => $result['status'] ?? 'unlabeled',
+        ]);
+    }
+
+    /**
      * Fetch real-time leaderboard data.
      */
     public function getLeaderboard()
@@ -705,9 +846,10 @@ class DatasetController extends Controller
                 ->pluck('labeled_by')
                 ->toArray();
 
-            // PENDING QUERY (with Filter & Search)
+            // PENDING QUERY (with Filter, Search & Sort)
             $filterUser = $request->query('filter_user');
             $searchPending = $request->query('search_pending');
+            [$pendingSort, $pendingSortColumn, $pendingSortDir] = $this->resolveSort($request->query('sort_pending'), 'oldest');
             
             $pendingQuery = Image::where('label_status', 'pending');
             if ($filterUser) {
@@ -721,12 +863,14 @@ class DatasetController extends Controller
                       ->orWhere('filename', 'like', '%' . $cleanSearchPending . '%');
                 });
             }
-            $pendingItems = $pendingQuery->orderBy('updated_at', 'asc')
+            $pendingItems = $pendingQuery->orderBy($pendingSortColumn, $pendingSortDir)
+                ->orderBy('id', 'asc')
                 ->paginate(20, ['*'], 'pending_page');
 
-            // APPROVED QUERY (with Filter & Search)
+            // APPROVED QUERY (with Filter, Search & Sort)
             $filterApprovedUser = $request->query('filter_approved_user');
             $searchApproved = $request->query('search_approved');
+            [$approvedSort, $approvedSortColumn, $approvedSortDir] = $this->resolveSort($request->query('sort_approved'), 'newest');
 
             $approvedQuery = Image::where('label_status', 'approved');
             if ($filterApprovedUser) {
@@ -739,7 +883,8 @@ class DatasetController extends Controller
                       ->orWhere('filename', 'like', '%' . $cleanSearchApproved . '%');
                 });
             }
-            $approvedItems = $approvedQuery->orderBy('updated_at', 'desc')
+            $approvedItems = $approvedQuery->orderBy($approvedSortColumn, $approvedSortDir)
+                ->orderBy('id', 'asc')
                 ->paginate(20, ['*'], 'approved_page');
 
             // Get database examples list for admin to delete/manage (stored on persistent volume)
@@ -763,7 +908,8 @@ class DatasetController extends Controller
                 'pendingLabelers', 'filterUser', 'searchPending',
                 'approvedLabelers', 'filterApprovedUser', 'searchApproved',
                 'workspaceSetting', 'competitionClasses', 'classStats', 'activeLeases',
-                'disputeStats', 'disputeItems', 'multiLabelerMode', 'requiredLabelers'
+                'disputeStats', 'disputeItems', 'multiLabelerMode', 'requiredLabelers',
+                'pendingSort', 'approvedSort'
             ));
         }
 

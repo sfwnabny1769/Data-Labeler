@@ -315,9 +315,16 @@
                         </option>
                     @endforeach
                 </select>
+                <select name="sort_pending" onchange="this.form.submit()" title="Urutkan tabel validasi" class="bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium">
+                    <option value="oldest" {{ $pendingSort === 'oldest' ? 'selected' : '' }}>Urut: Waktu (lama → baru)</option>
+                    <option value="newest" {{ $pendingSort === 'newest' ? 'selected' : '' }}>Urut: Waktu (baru → lama)</option>
+                    <option value="name_asc" {{ $pendingSort === 'name_asc' ? 'selected' : '' }}>Urut: Nama file (A → Z)</option>
+                    <option value="name_desc" {{ $pendingSort === 'name_desc' ? 'selected' : '' }}>Urut: Nama file (Z → A)</option>
+                    <option value="labeler" {{ $pendingSort === 'labeler' ? 'selected' : '' }}>Urut: Nama labeler (A → Z)</option>
+                </select>
                 <button type="submit" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition">Cari</button>
                 @if($filterUser || $searchPending)
-                    <a href="{{ route('admin') }}" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-semibold transition" title="Reset Filter & Pencarian">
+                    <a href="{{ route('admin', ['sort_pending' => $pendingSort]) }}" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-semibold transition" title="Reset Filter & Pencarian">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -371,6 +378,7 @@
                     <th class="py-4 px-6">Nama File</th>
                     <th class="py-4 px-6">Labeler (Prodi)</th>
                     <th class="py-4 px-6">Label Usulan</th>
+                    <th class="py-4 px-6 w-28">Waktu</th>
                     <th class="py-4 px-6 text-center w-72">Aksi Validasi</th>
                 </tr>
             </thead>
@@ -397,6 +405,12 @@
                             @endforeach
                         </td>
                         <td class="py-4 px-6">
+                            <div class="text-[11px] text-slate-400 font-medium" title="{{ $item->updated_at?->format('d M Y H:i:s') }}">
+                                {{ $item->updated_at?->diffForHumans() ?? '-' }}
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono">{{ $item->updated_at?->format('d M H:i') }}</div>
+                        </td>
+                        <td class="py-4 px-6">
                             <div class="flex items-center justify-center gap-2">
                                 <button onclick="approveLabel({{ $item->id }})" title="Setujui Label" class="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-400 rounded-xl transition-all duration-150 active:scale-95">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
@@ -412,7 +426,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="py-12 text-center text-slate-500 font-medium">Tidak ada data label yang perlu divalidasi. Pekerjaan teman-temanmu sudah beres!</td>
+                        <td colspan="6" class="py-12 text-center text-slate-500 font-medium">Tidak ada data label yang perlu divalidasi. Pekerjaan teman-temanmu sudah beres!</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -420,7 +434,7 @@
     </div>
 
     <div class="mt-6">
-        {{ $pendingItems->appends(['approved_page' => $approvedItems->currentPage(), 'filter_user' => $filterUser, 'search_pending' => $searchPending])->links() }}
+        {{ $pendingItems->appends(['approved_page' => $approvedItems->currentPage(), 'filter_user' => $filterUser, 'search_pending' => $searchPending, 'sort_pending' => $pendingSort, 'sort_approved' => $approvedSort])->links() }}
     </div>
 </section>
 
@@ -451,9 +465,16 @@
                         <option value="{{ $labeler }}" {{ $filterApprovedUser == $labeler ? 'selected' : '' }}>Filter: {{ $labeler }}</option>
                     @endforeach
                 </select>
+                <select name="sort_approved" onchange="this.form.submit()" title="Urutkan tabel validasi" class="bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium">
+                    <option value="newest" {{ $approvedSort === 'newest' ? 'selected' : '' }}>Urut: Waktu (baru → lama)</option>
+                    <option value="oldest" {{ $approvedSort === 'oldest' ? 'selected' : '' }}>Urut: Waktu (lama → baru)</option>
+                    <option value="name_asc" {{ $approvedSort === 'name_asc' ? 'selected' : '' }}>Urut: Nama file (A → Z)</option>
+                    <option value="name_desc" {{ $approvedSort === 'name_desc' ? 'selected' : '' }}>Urut: Nama file (Z → A)</option>
+                    <option value="labeler" {{ $approvedSort === 'labeler' ? 'selected' : '' }}>Urut: Nama labeler (A → Z)</option>
+                </select>
                 <button type="submit" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition">Cari</button>
                 @if($filterApprovedUser || $searchApproved)
-                    <a href="{{ route('admin') }}" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-semibold transition" title="Reset Filter & Pencarian">
+                    <a href="{{ route('admin', ['sort_approved' => $approvedSort]) }}" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-semibold transition" title="Reset Filter & Pencarian">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                     </a>
                 @endif
@@ -487,6 +508,7 @@
                     <th class="py-4 px-6">Nama File</th>
                     <th class="py-4 px-6">Labeler (Prodi)</th>
                     <th class="py-4 px-6">Label Disetujui</th>
+                    <th class="py-4 px-6 w-28">Waktu</th>
                     <th class="py-4 px-6 text-center w-60">Ubah Kembali</th>
                 </tr>
             </thead>
@@ -511,6 +533,12 @@
                             @endforeach
                         </td>
                         <td class="py-3 px-6">
+                            <div class="text-[11px] text-slate-400 font-medium" title="{{ $item->updated_at?->format('d M Y H:i:s') }}">
+                                {{ $item->updated_at?->diffForHumans() ?? '-' }}
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono">{{ $item->updated_at?->format('d M H:i') }}</div>
+                        </td>
+                        <td class="py-3 px-6">
                             <div class="flex items-center justify-center gap-1.5">
                                 @foreach($competitionClasses as $cls)
                                     <button onclick="updateLabel({{ $item->id }}, {{ $cls['id'] }}, true)" class="px-2 py-0.5 text-[10px] bg-slate-800 border border-slate-700 hover:border-{{ $cls['color'] ?? 'indigo' }}-500/35 hover:text-{{ $cls['color'] ?? 'indigo' }}-400 rounded font-semibold transition-all">Set {{ $cls['id'] }}</button>
@@ -520,14 +548,14 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="py-8 text-center text-slate-600 text-xs">Belum ada data label yang disetujui.</td></tr>
+                    <tr><td colspan="6" class="py-8 text-center text-slate-600 text-xs">Belum ada data label yang disetujui.</td></tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
     <div class="mt-6">
-        {{ $approvedItems->appends(['pending_page' => $pendingItems->currentPage(), 'filter_approved_user' => $filterApprovedUser, 'search_approved' => $searchApproved])->links() }}
+        {{ $approvedItems->appends(['pending_page' => $pendingItems->currentPage(), 'filter_approved_user' => $filterApprovedUser, 'search_approved' => $searchApproved, 'sort_pending' => $pendingSort, 'sort_approved' => $approvedSort])->links() }}
     </div>
 </section>
 
