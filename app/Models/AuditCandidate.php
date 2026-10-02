@@ -46,9 +46,9 @@ class AuditCandidate extends Model
     ];
 
     public const CLASS_OPTIONS = [
-        '0_Recyclable' => 'Recyclable -- plastik, kertas, logam, kaca, dll yang bisa didaur ulang.',
-        '1_Electronic' => 'Electronic -- perangkat/komponen elektronik (e-waste).',
-        '2_Organic' => 'Organic -- sisa makanan/bahan alami yang bisa terurai.',
+        '0_Aman' => 'Aman -- Paket/dus dalam kondisi utuh, mulus, dan layak kirim',
+        '1_Rusak' => 'Rusak -- Paket/dus mengalami kerusakan fisik (penyok, sobek, basah, atau hancur)',
+        '2_Lainnya' => 'Lainnya -- Kemasan non-standar / out-of-distribution (seperti food packaging, kantong plastik belanjaan, atau paper bag)',
     ];
 
     public const CONTAMINATION_DECISION = 'CONTAMINATION';
