@@ -115,7 +115,7 @@
         <section class="lg:col-span-8 flex flex-col gap-6">
             
             <!-- Statistics Bar -->
-            <div class="grid grid-cols-3 gap-4">
+            <div class="grid grid-cols-3 gap-4 nb-stats">
                 <div class="glass-card rounded-2xl p-4 flex flex-col justify-center">
                     <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sisa Gambar</span>
                     <span id="stat-left" class="text-2xl font-bold font-outfit text-indigo-300 mt-1">-</span>
@@ -141,7 +141,7 @@
                 </div>
 
                 <!-- Image Frame Container (Double-Buffered for Instant 0ms Swap) -->
-                <div class="w-full flex-grow flex items-center justify-center min-h-[340px] mb-6 relative rounded-2xl bg-slate-950/40 border border-slate-800/80 overflow-hidden group">
+                <div class="w-full flex-grow flex items-center justify-center min-h-[340px] mb-6 relative rounded-2xl bg-slate-950/40 border border-slate-800/80 overflow-hidden group nb-img-frame">
                     
                     <!-- Top Status Badges: Buffer Count & Sync Status -->
                     <div class="absolute top-3 right-3 z-20 flex items-center gap-2">
@@ -205,7 +205,7 @@
                             <button 
                                 type="button"
                                 onclick="submitLabel({{ $cls['id'] }})" 
-                                class="group relative flex flex-col items-center justify-center p-4 bg-gradient-to-br from-{{ $color }}-500/10 to-slate-900/40 hover:from-{{ $color }}-500/20 hover:to-slate-900/60 border border-{{ $color }}-500/20 hover:border-{{ $color }}-500/40 rounded-2xl transition-all duration-150 active:scale-95 text-center shadow-lg hover:shadow-{{ $color }}-500/10 cursor-pointer"
+                                class="group relative flex flex-col items-center justify-center p-4 bg-gradient-to-br from-{{ $color }}-500/10 to-slate-900/40 hover:from-{{ $color }}-500/20 hover:to-slate-900/60 border border-{{ $color }}-500/20 hover:border-{{ $color }}-500/40 rounded-2xl transition-all duration-150 active:scale-95 text-center shadow-lg hover:shadow-{{ $color }}-500/10 cursor-pointer nb-choice"
                             >
                                 <span class="absolute top-2.5 right-3 text-[10px] font-bold px-1.5 py-0.5 rounded bg-{{ $color }}-500/20 text-{{ $color }}-300 font-mono select-none">
                                     {{ $cls['shortcut_label'] }}
@@ -222,7 +222,7 @@
                     <button
                         type="button"
                         onclick="skipImage()"
-                        class="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-slate-800/70 hover:bg-slate-700/80 border border-slate-700 hover:border-slate-600 rounded-2xl text-xs font-semibold text-slate-300 transition-all duration-200 active:scale-[0.99] cursor-pointer"
+                        class="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-slate-800/70 hover:bg-slate-700/80 border border-slate-700 hover:border-slate-600 rounded-2xl text-xs font-semibold text-slate-300 transition-all duration-200 active:scale-[0.99] cursor-pointer nb-skip"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M4 12h16" />
@@ -236,7 +236,7 @@
         </section>
 
         <!-- Right Column: Guidelines & Leaderboard (4 Cols) -->
-        <section class="lg:col-span-4 flex flex-col gap-6">
+        <section class="lg:col-span-4 flex flex-col gap-6 nb-side">
             
             <!-- Guideline Box (Dynamic per competition class) -->
             <div class="glass-card rounded-3xl p-6 relative">

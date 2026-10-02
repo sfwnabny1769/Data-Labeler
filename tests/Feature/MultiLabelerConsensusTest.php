@@ -369,6 +369,49 @@ class MultiLabelerConsensusTest extends TestCase
         // Halaman masuk punya rules sendiri
         $response->assertSee('body.app-gate', false);
     }
+    /**
+     * Regression: gambar harus jadi elemen yang tumbuh, kartu lain dikecilkan.
+     *
+     * Tanpa aturan ini, kartu statistik/pedoman/leaderboard memakan tinggi
+     * sehingga frame gambar tertekan dan user harus zoom out supaya isi
+     * gambar terlihat utuh.
+     */
+    public function test_image_frame_absorbs_freed_space_on_desktop(): void
+    {
+        WorkspaceSetting::create([
+            'active_activity' => WorkspaceSetting::ACTIVE_LABELING,
+            'access_passkey' => 'TESTPASS123',
+            'multi_labeler_mode' => false,
+        ]);
+
+        $response = $this->withSession($this->userSession('UserA'))->get(route('home'));
+
+        $response->assertOk();
+
+        // Hook class penanda harus ada di markup halaman labeler.
+        $response->assertSee('nb-img-frame', false);
+        $response->assertSee('nb-stats', false);
+        $response->assertSee('nb-side', false);
+        $response->assertSee('nb-choice', false);
+        $response->assertSee('nb-skip', false);
+
+        // Aturan "gambar yang tumbuh" hanya untuk desktop, dan frame
+        // tidak lagi dikunci aspect-ratio / max-height vh.
+        $response->assertSee('@media (min-width: 1024px)', false);
+        $response->assertSee('body.app-labeler .nb-img-frame', false);
+        $response->assertSee('aspect-ratio: auto !important', false);
+        $response->assertSee('max-height: none !important', false);
+
+        // Halaman dikunci 100vh (tanpa scroll) di desktop.
+        $response->assertSee('max-height: 100dvh', false);
+        $response->assertSee('grid-template-rows: minmax(0, 1fr)', false);
+
+        // Gambar memakai seluruh frame tanpa gepeng (contain).
+        $response->assertSee('body.app-labeler .nb-img-frame .buffer-img', false);
+        $response->assertSee('object-fit: contain !important', false);
+    }
+
+
 
     /** Mode single-labeler (default) tidak boleh ikut terubah oleh fitur ini. */
     public function test_single_labeler_mode_keeps_legacy_behaviour(): void

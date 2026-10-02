@@ -600,6 +600,240 @@
     }
 
     /* Mobile: boleh scroll kalau layar sangat pendek */
+    /* ==========================================================
+       (9) FIT 100vh + GAMBAR SEBAGAI ELEMEN YANG TUMBUH
+       Gambar = konten utama, jadi dia yang boleh mengisi seluruh
+       ruang sisa. Kartu pendukung dikecilkan supaya halaman muat
+       di 100vh pada zoom 100% tanpa scroll. Desktop (>=1024px).
+       ========================================================== */
+    @media (min-width: 1024px) {
+        body.app-labeler {
+            height: 100vh;
+            height: 100dvh;
+            min-height: 0 !important;
+            max-height: 100vh;
+            max-height: 100dvh;
+            overflow: hidden;
+            padding-bottom: 0 !important;
+        }
+
+        body.app-labeler header {
+            flex: 0 0 auto;
+            padding-top: 0.45rem !important;
+            padding-bottom: 0.45rem !important;
+        }
+
+        body.app-labeler header .w-10 {
+            width: 2.1rem !important;
+            height: 2.1rem !important;
+        }
+
+        body.app-labeler header .w-10 svg {
+            width: 1rem !important;
+            height: 1rem !important;
+        }
+
+        body.app-labeler > main {
+            flex: 1 1 auto;
+            min-height: 0;
+            max-width: 1680px;
+            padding-top: 0.6rem !important;
+            padding-bottom: 0.4rem !important;
+            gap: 0.9rem !important;
+            grid-template-rows: minmax(0, 1fr);
+            overflow: hidden !important;
+        }
+
+        body.app-labeler > main > section {
+            min-height: 0;
+            gap: 0.5rem !important;
+        }
+
+        /* Kartu statistik: kecilkan */
+        body.app-labeler .nb-stats {
+            flex: 0 0 auto;
+            gap: 0.5rem !important;
+        }
+
+        body.app-labeler main .nb-stats > div {
+            padding: 0.35rem 0.6rem !important;
+            border-width: 2px !important;
+            box-shadow: 4px 4px 0 var(--nb-ink) !important;
+            border-radius: 10px !important;
+        }
+
+        body.app-labeler .nb-stats .text-xs {
+            font-size: 9px !important;
+            letter-spacing: 0.08em;
+        }
+
+        body.app-labeler .nb-stats .text-2xl {
+            font-size: 1.15rem !important;
+            line-height: 1.1 !important;
+            margin-top: 2px !important;
+        }
+
+        /* Kartu workspace: mengisi tinggi yang tersisa */
+        body.app-labeler .min-h-\[520px\] {
+            flex: 1 1 auto;
+            min-height: 0 !important;
+            padding: 0.6rem !important;
+            border-radius: 16px !important;
+        }
+
+        /* Frame gambar: satu-satunya elemen yang boleh membesar */
+        body.app-labeler .nb-img-frame {
+            flex: 1 1 auto;
+            aspect-ratio: auto !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            margin-bottom: 0.4rem !important;
+            border-width: 2px !important;
+        }
+
+        /* Alias kelas Tailwind lama, biar override pasti menang */
+        body.app-labeler .nb-img-frame.min-h-\[340px\] {
+            aspect-ratio: auto !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+        }
+
+        /* Gambar mengisi frame: upscale seragam, proporsi tetap, tidak meluber */
+        body.app-labeler .nb-img-frame .buffer-img {
+            inset: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            object-fit: contain !important;
+        }
+
+        /* Kontrol label: rapat */
+        body.app-labeler #label-controls {
+            flex: 0 0 auto;
+        }
+
+        body.app-labeler #label-controls > p {
+            margin-bottom: 0.25rem !important;
+            font-size: 9px !important;
+        }
+
+        body.app-labeler #label-controls > div {
+            gap: 0.4rem !important;
+        }
+
+        body.app-labeler #label-controls .nb-choice {
+            padding: 0.4rem 0.5rem !important;
+            border-width: 2px !important;
+            border-radius: 10px !important;
+            box-shadow: 3px 3px 0 var(--nb-ink) !important;
+        }
+
+        body.app-labeler .nb-choice .w-10 {
+            width: 1.7rem !important;
+            height: 1.7rem !important;
+            font-size: 0.7rem !important;
+            margin-bottom: 0.15rem !important;
+        }
+
+        body.app-labeler .nb-choice .font-bold {
+            font-size: 0.72rem !important;
+        }
+
+        body.app-labeler .nb-choice .text-\[10px\] {
+            font-size: 8px !important;
+            margin-top: 2px !important;
+        }
+
+        body.app-labeler #label-controls .nb-skip {
+            margin-top: 0.4rem !important;
+            padding-top: 0.4rem !important;
+            padding-bottom: 0.4rem !important;
+            font-size: 10px !important;
+            border-width: 2px !important;
+            border-radius: 10px !important;
+            box-shadow: 3px 3px 0 var(--nb-ink) !important;
+        }
+
+        /* Kolom kanan: pedoman + leaderboard diperkecil */
+        body.app-labeler .nb-side {
+            min-height: 0;
+            gap: 0.5rem !important;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        body.app-labeler section.nb-side > .glass-card {
+            padding: 0.6rem !important;
+            border-width: 2px !important;
+            border-radius: 16px !important;
+            box-shadow: 4px 4px 0 var(--nb-ink) !important;
+        }
+
+        body.app-labeler section.nb-side h3 {
+            font-size: 0.8rem !important;
+            margin-bottom: 0.4rem !important;
+        }
+
+        body.app-labeler section.nb-side h3 svg {
+            width: 0.9rem !important;
+            height: 0.9rem !important;
+        }
+
+        body.app-labeler section.nb-side .space-y-4 {
+            row-gap: 0.35rem !important;
+        }
+
+        body.app-labeler section.nb-side .space-y-4 > div {
+            padding: 0.35rem 0.5rem !important;
+            border-width: 2px !important;
+            border-radius: 8px !important;
+        }
+
+        body.app-labeler section.nb-side h4 {
+            font-size: 10px !important;
+        }
+
+        body.app-labeler section.nb-side p.text-xs {
+            font-size: 9.5px !important;
+            margin-top: 2px !important;
+        }
+
+        body.app-labeler section.nb-side .example-slideshow-container {
+            gap: 2px !important;
+            margin-top: 4px !important;
+        }
+
+        body.app-labeler #leaderboard-list {
+            max-height: 12vh !important;
+        }
+
+        /* Footer tipis */
+        body.app-labeler > footer {
+            flex: 0 0 auto;
+            padding: 0.15rem 1rem 0.3rem !important;
+            font-size: 9px !important;
+        }
+    }
+
+    /* Layar pendek: sisanya dirapatkan, gambar tetap dominan */
+    @media (min-width: 1024px) and (max-height: 760px) {
+        body.app-labeler > main {
+            padding-top: 0.4rem !important;
+        }
+
+        body.app-labeler section.nb-side .example-slideshow-container {
+            display: none;
+        }
+
+        body.app-labeler #leaderboard-list {
+            max-height: 9vh !important;
+        }
+    }
+
     @media (max-width: 1023px) {
         body.app-gate {
             overflow-y: auto;
