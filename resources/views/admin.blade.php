@@ -388,5 +388,7 @@
             });
         }
     </script>
+<!-- Lightbox gambar bersama (zoom + pan) -->
+    @include('partials.lightbox')
 </body>
 </html>

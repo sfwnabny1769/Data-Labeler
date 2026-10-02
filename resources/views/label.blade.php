@@ -393,6 +393,11 @@
 
             // Dynamic Keyboard Shortcut Bindings
             document.addEventListener('keydown', (e) => {
+                // Abaikan semua shortcut selagi lightbox gambar terbuka, supaya
+                // tombol label (S / Z / angka kelas) tidak ikut terpicu
+                // di belakang overlay.
+                if (!document.getElementById('lightbox-modal').classList.contains('hidden')) return;
+
                 if (document.getElementById('complete-screen').classList.contains('hidden') === false) return;
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -935,23 +940,11 @@
             return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
 
-        // Lightbox
-        function showLightbox(imgUrl) {
-            const modal = document.getElementById('lightbox-modal');
-            const img = document.getElementById('lightbox-img');
-            img.src = imgUrl;
-            modal.classList.remove('hidden');
-        }
-
-        function hideLightbox() {
-            const modal = document.getElementById('lightbox-modal');
-            modal.classList.add('hidden');
-        }
+        // Lightbox (showLightbox / hideLightbox / zoomLightbox) sekarang
+        // berasal dari partials.lightbox.
     </script>
 
-    <!-- Lightbox Modal Overlay -->
-    <div id="lightbox-modal" class="hidden fixed inset-0 bg-slate-950/90 z-[100] flex items-center justify-center p-4 cursor-zoom-out" onclick="hideLightbox()">
-        <img id="lightbox-img" src="" class="max-h-[85vh] max-w-full rounded-2xl object-contain shadow-2xl border border-slate-800 animate-fade-in">
-    </div>
+    <!-- Lightbox gambar bersama (zoom + pan) -->
+    @include('partials.lightbox')
 </body>
 </html>

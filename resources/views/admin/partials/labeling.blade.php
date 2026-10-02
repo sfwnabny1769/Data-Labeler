@@ -386,7 +386,7 @@
                 @forelse($pendingItems as $item)
                     <tr class="hover:bg-slate-900/20 transition-colors" id="row-pending-{{ $item->id }}">
                         <td class="py-4 px-6">
-                            <div class="relative group w-16 h-12 rounded-lg bg-slate-900 border border-slate-850 overflow-hidden flex items-center justify-center cursor-zoom-in">
+                            <div class="relative group w-16 h-12 rounded-lg bg-slate-900 border border-slate-850 overflow-hidden flex items-center justify-center cursor-zoom-in" onclick="showLightbox('{{ $item->url }}', @js($item->filename))" title="Klik untuk memperbesar">
                                 <img src="{{ $item->url }}" alt="{{ $item->filename }}" class="h-full w-full object-contain transition-transform duration-200 group-hover:scale-125">
                             </div>
                         </td>
@@ -516,7 +516,7 @@
                 @forelse($approvedItems as $item)
                     <tr class="hover:bg-slate-900/10 transition-colors" id="row-approved-{{ $item->id }}">
                         <td class="py-3 px-6">
-                            <div class="w-14 h-10 rounded bg-slate-900 border border-slate-850 overflow-hidden flex items-center justify-center">
+                            <div class="w-14 h-10 rounded bg-slate-900 border border-slate-850 overflow-hidden flex items-center justify-center cursor-zoom-in" onclick="showLightbox('{{ $item->url }}', @js($item->filename))" title="Klik untuk memperbesar">
                                 <img src="{{ $item->url }}" alt="{{ $item->filename }}" class="h-full w-full object-contain">
                             </div>
                         </td>
@@ -600,7 +600,9 @@
                     <div class="flex flex-col lg:flex-row lg:items-center gap-5">
                         <div class="flex items-center gap-4 flex-1 min-w-0">
                             <img src="{{ $item->url }}" alt="{{ $item->filename }}"
-                                 class="w-20 h-20 rounded-xl object-cover border-2 border-slate-700 shrink-0 bg-slate-800">
+                                 onclick="showLightbox('{{ $item->url }}', @js($item->filename))"
+                                 title="Klik untuk memperbesar"
+                                 class="w-20 h-20 rounded-xl object-cover border-2 border-slate-700 shrink-0 bg-slate-800 cursor-zoom-in hover:border-indigo-500/60 transition-colors">
                             <div class="min-w-0">
                                 <p class="text-xs font-bold text-slate-200 font-mono truncate">{{ $item->filename }}</p>
                                 <p class="text-[10px] text-slate-500 mt-1">
