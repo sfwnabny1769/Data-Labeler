@@ -70,7 +70,7 @@
     </style>
 @include('partials.neo')
 </head>
-<body class="min-h-screen text-slate-100 flex flex-col relative pb-8">
+<body class="app-labeler min-h-screen text-slate-100 flex flex-col relative pb-8">
 
     <!-- CSRF Token for Axios -->
     <meta name="csrf-token" content="{{ csrf_token() }}">

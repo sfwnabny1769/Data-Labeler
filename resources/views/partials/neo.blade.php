@@ -285,4 +285,214 @@
     .bg-slate-950\/95 .text-emerald-400 {
         color: #34d399 !important;
     }
+
+    /* ==========================================================
+       (6) FIT LAYOUT - tanpa scroll, proporsional di 100% zoom
+       ==========================================================
+       Masalah: halaman labeler memakai min-h-[520px] + min-h-[340px],
+       sehingga total tinggi melebihi layar laptop 1366x768 dan memaksa
+       user scroll (atau zoom out) agar tombol terlihat.
+
+       Solusi: pakai viewport-relative height (dvh/svh) supaya layout
+       mengikuti tinggi viewport yang tersedia. Tidak ada perubahan
+       struktur HTML/Blade.
+       */
+
+    html, body {
+        min-height: 100%;
+    }
+
+    /* Halaman labeler: 1 layar penuh, footer menempel bawah */
+    body.app-labeler {
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0 !important;
+        padding-bottom: 0 !important;
+        overflow: hidden;
+    }
+
+    body.app-labeler main {
+        flex: 1 1 auto;
+        min-height: 0 !important;
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    body.app-labeler header {
+        flex-shrink: 0;
+    }
+
+    /* Workspace card & frame gambar: tinggi mengikuti ruang tersisa */
+    body.app-labeler .min-h-\[520px\] {
+        min-height: clamp(200px, 32vh, 520px) !important;
+    }
+
+    body.app-labeler .min-h-\[340px\] {
+        min-height: 0 !important;
+        height: clamp(130px, 24vh, 340px) !important;
+    }
+
+    /* Leaderboard: scroll internal, bukan ikut mendorong halaman */
+    body.app-labeler .min-h-\[300px\] {
+        min-height: 0 !important;
+        max-height: 24vh !important;
+    }
+
+    body.app-labeler #leaderboard-list {
+        max-height: 17vh !important;
+    }
+
+    body.app-labeler > footer {
+        margin-top: 0 !important;
+        padding: 0.4rem 1rem !important;
+        flex-shrink: 0;
+    }
+
+    /* ================= Layar pendek / laptop kecil ================= */
+    @media (max-height: 800px) {
+        body.app-labeler .min-h-\[520px\] {
+            min-height: clamp(170px, 28vh, 520px) !important;
+        }
+
+        body.app-labeler .min-h-\[340px\] {
+            height: clamp(110px, 21vh, 340px) !important;
+        }
+
+        body.app-labeler .min-h-\[300px\] {
+            max-height: 20vh !important;
+        }
+
+        body.app-labeler #leaderboard-list {
+            max-height: 13vh !important;
+        }
+    }
+
+    @media (max-height: 650px) {
+        body.app-labeler .min-h-\[520px\] {
+            min-height: clamp(140px, 24vh, 520px) !important;
+        }
+
+        body.app-labeler .min-h-\[340px\] {
+            height: clamp(90px, 17vh, 340px) !important;
+        }
+
+        body.app-labeler .min-h-\[300px\] {
+            max-height: 16vh !important;
+        }
+    }
+
+    /* ================= MOBILE: tinggi dinamis & aman iOS ================= */
+    @media (max-width: 1023px) {
+        body.app-labeler {
+            overflow-y: auto;
+            overflow-x: hidden;
+            height: auto;
+            min-height: 100vh;
+            min-height: 100dvh;
+        }
+
+        body.app-labeler main {
+            overflow: visible;
+            padding-top: 0.75rem !important;
+            padding-bottom: 0.75rem !important;
+        }
+
+        body.app-labeler .min-h-\[520px\] {
+            min-height: 0 !important;
+        }
+
+        body.app-labeler .min-h-\[340px\] {
+            height: auto !important;
+            min-height: 55vw !important;
+        }
+
+        body.app-labeler .min-h-\[300px\] {
+            max-height: none !important;
+            min-height: 0 !important;
+        }
+
+        body.app-labeler #leaderboard-list {
+            max-height: 50vh !important;
+        }
+
+        body.app-labeler > footer {
+            padding: 0.5rem 1rem 1rem !important;
+        }
+    }
+
+    /* ==========================================================
+       (7) HALAMAN MASUK (nickname)
+       Supaya link "Masuk sebagai Admin" & footer selalu terlihat
+       tanpa scroll dan tanpa zoom out.
+       ========================================================== */
+    body.app-gate {
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow: hidden;
+        padding: 1rem !important;
+        align-items: center;
+    }
+
+    body.app-gate > div.w-full {
+        max-height: 100vh;
+        max-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    /* Judul menyusut supaya form tetap muat di layar pendek */
+    body.app-gate .text-center.mb-8 {
+        margin-bottom: 1rem !important;
+    }
+
+    body.app-gate h1 {
+        font-size: clamp(1.5rem, 5vw, 2.25rem) !important;
+        line-height: 1.15;
+    }
+
+    body.app-gate .glass-card {
+        padding: 1.25rem !important;
+        flex-shrink: 0;
+    }
+
+    /* Rapatkan jarak antar field */
+    body.app-gate form.space-y-6 {
+        row-gap: 0.75rem !important;
+    }
+
+    body.app-gate .space-y-4 {
+        row-gap: 0.75rem !important;
+    }
+
+    body.app-gate .mt-6 {
+        margin-top: 0.75rem !important;
+    }
+
+    /* Layar pendek: sembunyikan deskripsi panjang (info tidak kritis) */
+    @media (max-height: 700px) {
+        body.app-gate .text-center.mb-8 p {
+            display: none;
+        }
+
+        body.app-gate .text-center.mb-8 {
+            margin-bottom: 0.5rem !important;
+        }
+
+        body.app-gate .glass-card {
+            padding: 1rem !important;
+        }
+    }
+
+    /* Mobile: boleh scroll kalau layar sangat pendek */
+    @media (max-width: 1023px) {
+        body.app-gate {
+            overflow-y: auto;
+            height: auto;
+            min-height: 100vh;
+            min-height: 100dvh;
+        }
+    }
 </style>

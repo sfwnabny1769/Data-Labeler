@@ -37,7 +37,7 @@
     </style>
 @include('partials.neo')
 </head>
-<body class="min-h-screen flex items-center justify-center p-4 overflow-hidden text-slate-100 relative">
+<body class="app-gate min-h-screen flex items-center justify-center p-4 overflow-hidden text-slate-100 relative">
 
     <!-- Glowing Background Orbs -->
     <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none"></div>
