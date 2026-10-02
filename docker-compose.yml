@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: data_labeler_app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: "${COMPETITION_NAME:-Data Labeler}"
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: "http://localhost:8000"
+      DB_CONNECTION: mariadb
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: label
+      DB_USERNAME: labeler
+      DB_PASSWORD: labeler_password
+    volumes:
+      - ./public/dataset:/var/www/public/dataset
+      - ./storage/app:/var/www/storage/app
+    depends_on:
+      - db
+
+  db:
+    image: mariadb:10.4
+    container_name: data_labeler_db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: label
+      MYSQL_USER: labeler
+      MYSQL_PASSWORD: labeler_password
+      MYSQL_ROOT_PASSWORD: root_secure_password
+    volumes:
+      - labeler_db_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+
+volumes:
+  labeler_db_data:
+    driver: local
