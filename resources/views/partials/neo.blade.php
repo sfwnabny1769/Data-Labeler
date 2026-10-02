@@ -324,63 +324,141 @@
         flex-shrink: 0;
     }
 
-    /* Workspace card & frame gambar: tinggi mengikuti ruang tersisa */
+    /* Workspace card: mengikuti ruang yang tersisa */
     body.app-labeler .min-h-\[520px\] {
-        min-height: clamp(200px, 32vh, 520px) !important;
+        min-height: 0 !important;
+        flex: 1 1 auto;
+        padding: 1rem !important;
     }
 
+    /* Frame gambar: PRIORITASKAN UKURAN GAMBAR.
+       Pakai aspect-ratio supaya gambar besar & proporsional, bukan gepeng. */
     body.app-labeler .min-h-\[340px\] {
         min-height: 0 !important;
-        height: clamp(130px, 24vh, 340px) !important;
+        height: auto !important;
+        flex: 1 1 auto;
+        aspect-ratio: 16 / 9;
+        max-height: 46vh !important;
+        min-height: clamp(180px, 24vh, 340px) !important;
+        margin-bottom: 0.75rem !important;
     }
 
-    /* Leaderboard: scroll internal, bukan ikut mendorong halaman */
+    /* Gambar mengisi frame tanpa keluar dari batas */
+    body.app-labeler .buffer-img {
+        max-height: 100% !important;
+        max-width: 100% !important;
+        object-fit: contain !important;
+    }
+
+    /* Judul "Pilih Label Klasifikasi" lebih rapat */
+    body.app-labeler #label-controls > p {
+        margin-bottom: 0.5rem !important;
+        font-size: 10px !important;
+    }
+
+    /* Grid tombol label lebih rapat */
+    body.app-labeler #label-controls > div {
+        gap: 0.5rem !important;
+    }
+
+    /* Tombol label: padding dikecilkan agar tidak mendorong halaman */
+    body.app-labeler #label-controls button {
+        padding: 0.5rem !important;
+    }
+
+    /* Tombol lewati */
+    body.app-labeler #label-controls > button {
+        margin-top: 0.5rem !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+
+    /* Statistik bar lebih tipis */
+    body.app-labeler .grid.grid-cols-3 {
+        gap: 0.75rem !important;
+    }
+
+    body.app-labeler .grid.grid-cols-3 > div {
+        padding: 0.5rem !important;
+    }
+
+    /* Panduan pelabelan dipadatkan */
+    body.app-labeler section.lg\:col-span-4 .glass-card {
+        padding: 0.75rem !important;
+    }
+
+    body.app-labeler section.lg\:col-span-4 h3 {
+        margin-bottom: 0.5rem !important;
+        font-size: 0.875rem !important;
+    }
+
+    /* Leaderboard: scroll internal, tinggi dibatasi ketat */
     body.app-labeler .min-h-\[300px\] {
         min-height: 0 !important;
-        max-height: 24vh !important;
+        flex: 0 1 auto;
+        max-height: 18vh !important;
+        padding: 0.75rem !important;
     }
 
     body.app-labeler #leaderboard-list {
-        max-height: 17vh !important;
+        max-height: 12vh !important;
     }
 
     body.app-labeler > footer {
         margin-top: 0 !important;
-        padding: 0.4rem 1rem !important;
+        padding: 0.3rem 1rem !important;
         flex-shrink: 0;
+        font-size: 10px !important;
     }
 
     /* ================= Layar pendek / laptop kecil ================= */
     @media (max-height: 800px) {
-        body.app-labeler .min-h-\[520px\] {
-            min-height: clamp(170px, 28vh, 520px) !important;
-        }
-
         body.app-labeler .min-h-\[340px\] {
-            height: clamp(110px, 21vh, 340px) !important;
+            aspect-ratio: auto;
+            height: clamp(160px, 26vh, 340px) !important;
+            min-height: 0 !important;
+            max-height: 26vh !important;
         }
 
         body.app-labeler .min-h-\[300px\] {
-            max-height: 20vh !important;
+            max-height: 14vh !important;
         }
 
         body.app-labeler #leaderboard-list {
-            max-height: 13vh !important;
+            max-height: 9vh !important;
         }
     }
 
     @media (max-height: 650px) {
-        body.app-labeler .min-h-\[520px\] {
-            min-height: clamp(140px, 24vh, 520px) !important;
-        }
-
         body.app-labeler .min-h-\[340px\] {
-            height: clamp(90px, 17vh, 340px) !important;
+            height: clamp(130px, 22vh, 340px) !important;
+            max-height: 22vh !important;
         }
 
         body.app-labeler .min-h-\[300px\] {
-            max-height: 16vh !important;
+            max-height: 12vh !important;
         }
+    }
+
+    /* ==========================================================
+       (8) PERBAIKAN KONTRAS TAMBAHAN
+       Banner "Zero-Latency Workspace" memakai gradient teks + bg
+       transparan. Setelah restyle Neobrutalism, teksnya jadi nyaris
+       tak terlihat. Kita beri warna solid yang kontras.
+       ========================================================== */
+    body.app-labeler header span.bg-clip-text,
+    body.app-labeler header span.text-transparent {
+        background-image: none !important;
+        -webkit-text-fill-color: var(--nb-ink) !important;
+        color: var(--nb-ink) !important;
+        font-weight: 800 !important;
+    }
+
+    /* Badge "Zero-Latency Workspace" */
+    body.app-labeler header span.uppercase.bg-indigo-400\/10 {
+        background: var(--nb-yellow) !important;
+        color: var(--nb-ink) !important;
+        border: 2px solid var(--nb-ink) !important;
     }
 
     /* ================= MOBILE: tinggi dinamis & aman iOS ================= */
@@ -431,7 +509,7 @@
         min-height: 100vh;
         min-height: 100dvh;
         overflow: hidden;
-        padding: 1rem !important;
+        padding: 0.75rem !important;
         align-items: center;
     }
 
@@ -443,32 +521,67 @@
         justify-content: center;
     }
 
+    /* Logo lebih kecil */
+    body.app-gate .text-center.mb-8 .inline-flex {
+        width: 2.75rem !important;
+        height: 2.75rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    body.app-gate .text-center.mb-8 svg {
+        width: 1.25rem !important;
+        height: 1.25rem !important;
+    }
+
     /* Judul menyusut supaya form tetap muat di layar pendek */
     body.app-gate .text-center.mb-8 {
-        margin-bottom: 1rem !important;
+        margin-bottom: 0.75rem !important;
     }
 
     body.app-gate h1 {
-        font-size: clamp(1.5rem, 5vw, 2.25rem) !important;
-        line-height: 1.15;
+        font-size: clamp(1.35rem, 4.5vw, 2rem) !important;
+        line-height: 1.1 !important;
     }
 
+    /* Kartu form: padding_INTERNAL tetap, tapi jarak antar bagian dirapatkan */
     body.app-gate .glass-card {
-        padding: 1.25rem !important;
+        padding: 1.1rem !important;
         flex-shrink: 0;
     }
 
-    /* Rapatkan jarak antar field */
+    /* Rapatkan jarak form & field */
     body.app-gate form.space-y-6 {
-        row-gap: 0.75rem !important;
+        row-gap: 0.6rem !important;
     }
 
     body.app-gate .space-y-4 {
-        row-gap: 0.75rem !important;
+        row-gap: 0.6rem !important;
     }
 
+    /* Input lebih pendek (tinggi kecil tapi tetap mudah diketik) */
+    body.app-gate input {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+
+    body.app-gate label {
+        margin-bottom: 0.25rem !important;
+        font-size: 10px !important;
+    }
+
+    /* Tombol submit sedikit lebih pendek */
+    body.app-gate button[type="submit"] {
+        padding-top: 0.6rem !important;
+        padding-bottom: 0.6rem !important;
+    }
+
+    /* Blok link Admin + footer */
     body.app-gate .mt-6 {
-        margin-top: 0.75rem !important;
+        margin-top: 0.6rem !important;
+    }
+
+    body.app-gate .text-center.mt-6 .space-y-4 {
+        row-gap: 0.5rem !important;
     }
 
     /* Layar pendek: sembunyikan deskripsi panjang (info tidak kritis) */
