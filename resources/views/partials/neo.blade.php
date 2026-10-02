@@ -392,16 +392,16 @@
         font-size: 0.875rem !important;
     }
 
-    /* Leaderboard: scroll internal, tinggi dibatasi ketat */
+    /* Leaderboard: tinggi natural, scroll internal (bukan dikepit vh),
+       supaya daftar rekor tetap terlihat. */
     body.app-labeler .min-h-\[300px\] {
         min-height: 0 !important;
-        flex: 0 1 auto;
-        max-height: 18vh !important;
+        flex: 1 1 auto;
         padding: 0.75rem !important;
     }
 
     body.app-labeler #leaderboard-list {
-        max-height: 12vh !important;
+        max-height: none !important;
     }
 
     body.app-labeler > footer {
@@ -420,12 +420,8 @@
             max-height: 26vh !important;
         }
 
-        body.app-labeler .min-h-\[300px\] {
-            max-height: 14vh !important;
-        }
-
-        body.app-labeler #leaderboard-list {
-            max-height: 9vh !important;
+        body.app-labeler .nb-leader {
+            min-height: 8rem !important;
         }
     }
 
@@ -435,8 +431,8 @@
             max-height: 22vh !important;
         }
 
-        body.app-labeler .min-h-\[300px\] {
-            max-height: 12vh !important;
+        body.app-labeler .nb-leader {
+            min-height: 7rem !important;
         }
     }
 
@@ -758,12 +754,41 @@
             box-shadow: 3px 3px 0 var(--nb-ink) !important;
         }
 
-        /* Kolom kanan: pedoman + leaderboard diperkecil */
+        /* Kolom kanan: pedoman tetap, leaderboard mengisi sisa tinggi */
         body.app-labeler .nb-side {
             min-height: 0;
             gap: 0.5rem !important;
+            overflow: hidden;
+        }
+
+        /* Pedoman: tinggi natural, boleh menyusut + scroll internal */
+        body.app-labeler .nb-guide {
+            flex: 0 1 auto;
+            min-height: 0 !important;
             overflow-y: auto;
-            overflow-x: hidden;
+            overscroll-behavior: contain;
+        }
+
+        /* Leaderboard: ikut membesar mengisi ruang sisa kolom kanan */
+        body.app-labeler .nb-leader {
+            flex: 1 1 auto !important;
+            min-height: 9rem !important;
+            max-height: none !important;
+        }
+
+        /* Daftar rekor mengisi kartu dan scroll sendiri */
+        body.app-labeler .nb-leader #leaderboard-list {
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: none !important;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            gap: 0.3rem !important;
+        }
+
+        body.app-labeler .nb-leader #leaderboard-list > div {
+            padding: 0.35rem 0.5rem !important;
+            border-radius: 8px !important;
         }
 
         body.app-labeler section.nb-side > .glass-card {
@@ -807,8 +832,8 @@
             margin-top: 4px !important;
         }
 
-        body.app-labeler #leaderboard-list {
-            max-height: 12vh !important;
+        body.app-labeler .nb-leader {
+            min-height: 8rem !important;
         }
 
         /* Footer tipis */
@@ -829,8 +854,8 @@
             display: none;
         }
 
-        body.app-labeler #leaderboard-list {
-            max-height: 9vh !important;
+        body.app-labeler .nb-leader {
+            min-height: 7rem !important;
         }
     }
 

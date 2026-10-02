@@ -239,7 +239,7 @@
         <section class="lg:col-span-4 flex flex-col gap-6 nb-side">
             
             <!-- Guideline Box (Dynamic per competition class) -->
-            <div class="glass-card rounded-3xl p-6 relative">
+            <div class="glass-card rounded-3xl p-6 relative nb-guide">
                 <div class="absolute -top-px left-6 right-6 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent"></div>
                 <h3 class="font-outfit font-bold text-lg mb-4 flex items-center gap-2 text-slate-100">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -282,7 +282,7 @@
             </div>
 
             <!-- Leaderboard Box -->
-            <div class="glass-card rounded-3xl p-6 relative flex flex-col flex-grow min-h-[300px]">
+            <div class="glass-card rounded-3xl p-6 relative flex flex-col flex-grow min-h-[300px] nb-leader">
                 <div class="absolute -top-px left-6 right-6 h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent"></div>
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="font-outfit font-bold text-lg flex items-center gap-2 text-slate-100">

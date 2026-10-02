@@ -394,6 +394,15 @@ class MultiLabelerConsensusTest extends TestCase
         $response->assertSee('nb-side', false);
         $response->assertSee('nb-choice', false);
         $response->assertSee('nb-skip', false);
+        $response->assertSee('nb-leader', false);
+        $response->assertSee('nb-guide', false);
+
+        // Leaderboard harus punya tinggi nyata (tidak lagi dikepit max-height vh)
+        // supaya daftar rekor tidak gepeng di kolom kanan.
+        $response->assertSee('body.app-labeler .nb-leader #leaderboard-list', false);
+        $response->assertDontSee('max-height: 9vh', false);
+        $response->assertDontSee('max-height: 12vh', false);
+        $response->assertDontSee('max-height: 18vh', false);
 
         // Aturan "gambar yang tumbuh" hanya untuk desktop, dan frame
         // tidak lagi dikunci aspect-ratio / max-height vh.
