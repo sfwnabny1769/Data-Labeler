@@ -25,6 +25,7 @@
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
         button:disabled { opacity: 0.3; cursor: not-allowed; }
     </style>
+@include('partials.neo')
 </head>
 <body class="min-h-screen text-slate-100 flex flex-col relative pb-8">
 
@@ -112,7 +113,7 @@
         <p class="text-center text-[11px] text-slate-500">Shortcut keyboard: <kbd class="bg-slate-800 px-1.5 py-0.5 rounded">1</kbd>-<kbd class="bg-slate-800 px-1.5 py-0.5 rounded">4</kbd> untuk memutuskan, <kbd class="bg-slate-800 px-1.5 py-0.5 rounded">Enter</kbd> untuk lanjut.</p>
     </main>
 
-    <footer class="text-center pb-8 mt-4 text-[11px] text-slate-500 font-medium tracking-wide z-10">&copy; 2026 &bull; Tim BDC Satria Data Universitas Jambi</footer>
+    <footer class="text-center pb-8 mt-4 text-[11px] text-slate-500 font-medium tracking-wide z-10">&copy; 2026 &bull; Tim DATASCAPE 2026 Polban</footer>
 
     <script>
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');

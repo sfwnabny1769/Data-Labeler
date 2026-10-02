@@ -52,6 +52,7 @@
             border: none !important;
         }
     </style>
+@include('partials.neo')
 </head>
 <body class="min-h-screen text-slate-100 flex flex-col relative pb-12">
 
@@ -79,9 +80,6 @@
         <div class="flex items-center gap-4">
             <a href="{{ route('home') }}" class="text-xs font-semibold text-slate-300 hover:text-indigo-400 transition-colors duration-200">
                 Workspace Label
-            </a>
-            <a href="{{ route('admin.audit') }}" class="text-xs font-semibold text-slate-300 hover:text-amber-400 transition-colors duration-200">
-                Audit Label
             </a>
 
             <form action="{{ route('admin.logout') }}" method="POST" class="inline">
@@ -122,657 +120,98 @@
             </div>
         @endif
 
+        @php
+            // Normalisasi mode aktif: 'audit' (legacy) diperlakukan sebagai 'preprocess'
+            // agar partial yang benar tetap dimuat tanpa migrasi data.
+            $activeMode = $workspaceSetting->active_activity ?? 'labeling';
+            if ($activeMode === 'audit') {
+                $activeMode = 'preprocess';
+            }
+            $modeLabel = match($activeMode) {
+                'preprocess' => 'Fase 0 — Preprocessing & Cleaning',
+                'labeling'   => 'Fase 1 — Pelabelan Manual Test Set',
+                default      => 'Tidak diketahui',
+            };
+        @endphp
+
+        <!-- Kontrol Workspace Card (always visible) -->
         <div class="glass-card rounded-3xl p-6 shadow-xl relative">
             <div class="absolute -top-px left-8 right-8 h-px bg-gradient-to-r from-transparent via-slate-500/20 to-transparent"></div>
             <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
                 <div>
                     <h2 class="text-xl font-bold font-outfit text-slate-100">Kontrol Workspace</h2>
-                    <p class="text-xs text-slate-400 mt-1">Atur passkey dan pilih activity yang sedang dibuka. Saat mode audit aktif, user hanya bisa masuk audit; saat mode labeling aktif, user diarahkan ke workspace labeling.</p>
+                    <p class="text-xs text-slate-400 mt-1">Atur passkey dan pilih fase yang sedang dibuka. Kartu konten di bawah otomatis menyesuaikan fase yang dipilih.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3 text-xs">
-                    <span class="px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-700 text-slate-300">Mode aktif: <b class="text-white">{{ $workspaceSetting->active_activity ?? 'labeling' }}</b></span>
+                    <span class="px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-700 text-slate-300">Fase aktif: <b class="text-white">{{ $modeLabel }}</b></span>
                     <span class="px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-700 text-slate-300">Passkey aktif: <b class="text-white font-mono">{{ $workspaceSetting->access_passkey ?? '-' }}</b></span>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+                <!-- Mode switcher + multi-labeler toggle -->
                 <form action="{{ route('admin.workspace-settings') }}" method="POST" class="glass-card rounded-2xl p-4 space-y-3">
                     @csrf
-                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Aktivitas yang dibuka</label>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Fase yang dibuka</label>
                     <select name="active_activity" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium font-outfit">
-                        <option value="labeling" @selected(($workspaceSetting->active_activity ?? 'labeling') === 'labeling')>Fase 2: Active Labeling (Pelabelan Crowdsourced)</option>
-                        <option value="audit" @selected(($workspaceSetting->active_activity ?? 'labeling') === 'audit')>Fase 1: Preprocessing & Cleaning (Audit Outlier & Salah Label)</option>
+                        <option value="preprocess" @selected($activeMode === 'preprocess')>Fase 0 — Preprocessing & Cleaning (Audit Train Set)</option>
+                        <option value="labeling" @selected($activeMode === 'labeling')>Fase 1 — Pelabelan Manual Test Set (Kunci Jawaban Tim)</option>
                     </select>
-                    <button type="submit" class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-all">Simpan Mode Aktif</button>
+
+                    <!-- Multi-labeler toggle (only relevant for Fase 1) -->
+                    <label class="flex items-center justify-between gap-3 mt-2 p-3 bg-slate-900/60 border border-slate-800 rounded-xl cursor-pointer select-none">
+                        <div class="flex items-start gap-2.5">
+                            <span class="w-2 h-2 rounded-full mt-1.5 {{ ($workspaceSetting->multi_labeler_mode ?? false) ? 'bg-emerald-400' : 'bg-slate-600' }}"></span>
+                            <div>
+                                <span class="text-[11px] font-bold text-slate-200 block">Mode Multi-labeler per Gambar</span>
+                                <span class="text-[10px] text-slate-400 block mt-0.5">Untuk Fase 1: lebih dari satu labeler bisa melabel gambar yang sama (ukur inter-annotator agreement). Default OFF — satu gambar satu labeler (lease & lock).</span>
+                            </div>
+                        </div>
+                        <input type="checkbox" name="multi_labeler_mode" value="1" {{ ($workspaceSetting->multi_labeler_mode ?? false) ? 'checked' : '' }} class="sr-only peer" onchange="this.closest('label').querySelector('span.rounded-full').classList.toggle('bg-emerald-400', this.checked); this.closest('label').querySelector('span.rounded-full').classList.toggle('bg-slate-600', !this.checked)">
+                        <span class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-slate-700 peer-checked:bg-indigo-600 transition-colors">
+                            <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition {{ ($workspaceSetting->multi_labeler_mode ?? false) ? 'translate-x-4' : 'translate-x-1' }}"></span>
+                        </span>
+                    </label>
+
+                    <button type="submit" class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-all">Simpan Pengaturan Workspace</button>
                 </form>
 
-                <form action="{{ route('admin.workspace-passkey') }}" method="POST" class="glass-card rounded-2xl p-4 space-y-3">
+                <!-- Passkey custom + generate random -->
+                <form action="{{ route('admin.workspace-passkey') }}" method="POST" class="glass-card rounded-2xl p-4 space-y-3" id="passkey-form">
                     @csrf
-                    <p class="text-xs text-slate-400">Generate passkey baru kalau ingin mengganti akses user. Setelah itu, bagikan passkey terbaru ke user yang boleh mengakses workspace.</p>
-                    <button type="submit" class="w-full py-3 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold transition-all">Generate Passkey Baru</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Synchronization & Download Toolbar -->
-        <div class="glass-card rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl relative">
-            <div class="absolute -top-px left-8 right-8 h-px bg-gradient-to-r from-transparent via-slate-500/20 to-transparent"></div>
-            <div>
-                <h2 class="text-xl font-bold font-outfit text-slate-100">Manajemen Dataset & Hasil</h2>
-                <p class="text-xs text-slate-400 mt-1">Gunakan tombol sync untuk memindai folder lokal <code class="bg-slate-900 px-1.5 py-0.5 rounded text-indigo-300">D:\SATRIA DATA\test</code>, dan tombol unduh untuk mendapatkan file CSV akhir.</p>
-            </div>
-            
-            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                <form action="{{ route('admin.sync') }}" method="POST" class="w-full sm:w-auto">
-                    @csrf
-                    <button type="submit" class="w-full px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/15 hover:shadow-indigo-600/30 transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.2" />
-                        </svg>
-                        Sinkronisasi Folder
-                    </button>
-                </form>
-                
-                <a href="{{ route('admin.download') }}" class="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-semibold shadow-lg shadow-emerald-500/15 hover:shadow-emerald-500/30 transform hover:-translate-y-0.5 active:translate-y-0 transition-all text-center flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Unduh CSV Hasil
-                </a>
-            </div>
-        </div>
-        <!-- Upload Panel Section -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            <!-- Upload Dataset ZIP Card -->
-            <div class="glass-card rounded-3xl p-6 relative shadow-xl">
-                <div class="absolute -top-px left-8 right-8 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent"></div>
-                <div class="mb-4">
-                    <h3 class="text-lg font-bold font-outfit text-slate-100 flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        Upload ZIP Dataset (Data Test)
-                    </h3>
-                    <p class="text-xs text-slate-400 mt-1">Unggah file ZIP berisi kumpulan gambar test langsung dari komputer lokal Anda ke server.</p>
-                    
-                    <!-- Warning Box -->
-                    <div class="mt-4 p-3 bg-red-500/10 border border-red-500/25 rounded-2xl flex items-start gap-2.5 text-red-400">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        <div>
-                            <span class="text-xs font-bold block uppercase tracking-wider">Peringatan Penting:</span>
-                            <span class="text-[10px] font-medium leading-relaxed block mt-0.5 text-slate-300">Mengunggah dataset ZIP baru dapat menimpa data gambar lama dan menghapus seluruh progres pelabelan yang sudah berjalan. Pastikan Anda telah mengunduh file CSV hasil pelabelan sebelumnya!</span>
-                        </div>
-                    </div>
-                </div>
-
-                <form id="zip-upload-form" onsubmit="uploadZip(event)" class="space-y-4">
-                    @csrf
-                    <div class="flex items-center justify-center w-full">
-                        <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-700 border-dashed rounded-2xl cursor-pointer bg-slate-900/40 hover:bg-slate-900/60 transition-all duration-200">
-                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 mb-2 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2-8H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V8l-6-6z" />
-                                </svg>
-                                <p class="mb-1 text-xs text-slate-300 font-semibold" id="zip-file-label">Klik untuk memilih file ZIP</p>
-                                <p class="text-[10px] text-slate-500">ZIP (Maksimal 200MB)</p>
-                            </div>
-                            <input type="file" name="dataset_zip" id="dataset_zip" accept=".zip" class="hidden" required onchange="updateZipFileName(this)" />
-                        </label>
-                    </div>
-
-                    <!-- Progress Bar Container -->
-                    <div id="upload-progress-container" class="hidden space-y-2 p-3 bg-slate-900/60 rounded-xl border border-slate-800">
-                        <div class="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                            <span id="upload-progress-text">Mengunggah: 0%</span>
-                            <span id="upload-speed-text">-- KB/s</span>
-                        </div>
-                        <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-850">
-                            <div id="upload-progress-bar" class="bg-indigo-500 h-full rounded-full transition-all duration-150" style="width: 0%"></div>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/20 transition-all duration-200 flex items-center justify-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Ekstrak & Sinkronisasi ZIP
-                    </button>
-                </form>
-            </div>
-
-            <!-- Upload Guidelines Examples Card -->
-            <div class="glass-card rounded-3xl p-6 relative shadow-xl">
-                <div class="absolute -top-px left-8 right-8 h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent"></div>
-                <div class="mb-4">
-                    <h3 class="text-lg font-bold font-outfit text-slate-100 flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Upload Gambar Contoh (Guidelines)
-                    </h3>
-                    <p class="text-xs text-slate-400 mt-1">Unggah beberapa gambar sampel untuk dijadikan panduan klasifikasi di workspace pelabelan.</p>
-                </div>
-
-                <form action="{{ route('admin.upload-examples') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
-                    @csrf
-                    <div class="grid grid-cols-3 gap-3">
-                        <div class="col-span-1">
-                            <label for="label_select" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Kelas</label>
-                            <select name="label" id="label_select" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500 font-medium">
-                                <option value="0">0 - Recycleable</option>
-                                <option value="1">1 - Electronics</option>
-                                <option value="2">2 - Organics</option>
-                            </select>
-                        </div>
-                        <div class="col-span-2">
-                            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Pilih File Gambar</label>
-                            <div class="relative">
-                                <input type="file" name="example_images[]" id="example_images" accept="image/*" multiple required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-purple-500 font-medium" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="w-full py-3 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-lg shadow-purple-600/20 transition-all duration-200 flex items-center justify-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Upload Gambar Contoh
-                    </button>
-                </form>
-
-                <!-- Current Example Images Gallery -->
-                <div class="mt-4 pt-4 border-t border-slate-800">
-                    <h4 class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Daftar Contoh Saat Ini:</h4>
-                    <div class="space-y-3 max-h-[140px] overflow-y-auto pr-1">
-                        @foreach([0, 1, 2] as $lbl)
-                            <div class="flex flex-col gap-1.5">
-                                <div class="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
-                                    <span class="w-2 h-2 rounded-full {{ $lbl == 0 ? 'bg-emerald-500' : ($lbl == 1 ? 'bg-blue-500' : 'bg-amber-500') }}"></span>
-                                    Kelas {{ $lbl }} ({{ $lbl == 0 ? 'Recycleable' : ($lbl == 1 ? 'Electronics' : 'Organics') }})
-                                </div>
-                                @if(empty($manualExamples[$lbl]))
-                                    <div class="text-[10px] text-slate-500 italic pl-3.5">Belum ada contoh manual.</div>
-                                @else
-                                    <div class="flex flex-wrap gap-2 pl-3.5">
-                                        @foreach($manualExamples[$lbl] as $ex)
-                                            <div class="relative w-10 h-10 rounded border border-slate-850 bg-slate-900 overflow-hidden group">
-                                                <img src="{{ $ex['url'] }}" class="w-full h-full object-cover">
-                                                <form action="{{ route('admin.delete-example') }}" method="POST" class="absolute inset-0 bg-slate-950/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-150">
-                                                    @csrf
-                                                    <input type="hidden" name="id" value="{{ $ex['id'] }}">
-                                                    <button type="submit" class="text-red-400 hover:text-red-300" title="Hapus Gambar">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
-                                                        </svg>
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                @endif
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-
-        </div>
-        <!-- Statistics Dashboard -->
-        <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="glass-card rounded-2xl p-5">
-                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Total Database</span>
-                <span class="text-3xl font-extrabold font-outfit text-slate-100 mt-2 block">{{ number_format($stats['total'], 0, ',', '.') }}</span>
-                <span class="text-[10px] text-slate-400 mt-1 block">Seluruh data yang terdaftar</span>
-            </div>
-            
-            <div class="glass-card rounded-2xl p-5">
-                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Belum Dilabel (Unlabeled)</span>
-                <span class="text-3xl font-extrabold font-outfit text-indigo-400 mt-2 block">{{ number_format($stats['unlabeled'], 0, ',', '.') }}</span>
-                <span class="text-[10px] text-slate-400 mt-1 block">Tersisa di pool workspace</span>
-            </div>
-
-            <div class="glass-card rounded-2xl p-5">
-                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Perlu Validasi (Pending)</span>
-                <span class="text-3xl font-extrabold font-outfit text-amber-400 mt-2 block">{{ number_format($stats['pending'], 0, ',', '.') }}</span>
-                <span class="text-[10px] text-slate-400 mt-1 block">Menunggu persetujuan admin</span>
-            </div>
-
-            <div class="glass-card rounded-2xl p-5">
-                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Disetujui (Approved)</span>
-                <span class="text-3xl font-extrabold font-outfit text-emerald-400 mt-2 block">{{ number_format($stats['approved'], 0, ',', '.') }}</span>
-                <span class="text-[10px] text-slate-400 mt-1 block">Akan diexport ke CSV hasil</span>
-            </div>
-        </section>
-
-        <!-- Class Distribution Summary (Approved only) -->
-        <div class="glass-card rounded-3xl p-6 relative">
-            <div class="absolute -top-px left-8 right-8 h-px bg-gradient-to-r from-transparent via-slate-500/10 to-transparent"></div>
-            <h3 class="font-outfit font-bold text-sm text-slate-300 uppercase tracking-widest mb-4">Distribusi Kelas Terlabel Disetujui</h3>
-            
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div class="flex items-center gap-3 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4">
-                    <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">0</div>
-                    <div>
-                        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Recycleable</span>
-                        <span class="text-lg font-bold text-slate-200">{{ number_format($stats['recycleable'], 0, ',', '.') }} <span class="text-xs font-normal text-slate-500">img</span></span>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-3 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4">
-                    <div class="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold">1</div>
-                    <div>
-                        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Electronics</span>
-                        <span class="text-lg font-bold text-slate-200">{{ number_format($stats['electronics'], 0, ',', '.') }} <span class="text-xs font-normal text-slate-500">img</span></span>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-3 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4">
-                    <div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/20 text-amber-400 flex items-center justify-center font-bold">2</div>
-                    <div>
-                        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Organics</span>
-                        <span class="text-lg font-bold text-slate-200">{{ number_format($stats['organics'], 0, ',', '.') }} <span class="text-xs font-normal text-slate-500">img</span></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="glass-card rounded-3xl p-6 relative">
-            <div class="absolute -top-px left-8 right-8 h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent"></div>
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h3 class="font-outfit font-bold text-sm text-slate-300 uppercase tracking-widest">Audit Snapshot</h3>
-                    <p class="text-xs text-slate-400 mt-1">Ringkasan singkat aktivitas audit untuk memastikan panel labeling dan audit tetap terlihat dalam satu halaman admin.</p>
-                </div>
-                <a href="{{ route('admin.audit') }}" class="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold transition-all text-center">Buka Panel Audit</a>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
-                <div class="bg-slate-900/50 rounded-2xl p-4">
-                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Total Kandidat Audit</span>
-                    <span class="text-3xl font-extrabold font-outfit text-slate-100 mt-2 block">{{ number_format($stats['audit_total'] ?? 0, 0, ',', '.') }}</span>
-                </div>
-                <div class="bg-slate-900/50 rounded-2xl p-4">
-                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Belum Ditinjau</span>
-                    <span class="text-3xl font-extrabold font-outfit text-amber-300 mt-2 block">{{ number_format($stats['audit_round1_pending'] ?? 0, 0, ',', '.') }}</span>
-                </div>
-                <div class="bg-slate-900/50 rounded-2xl p-4">
-                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Belum Direlabel</span>
-                    <span class="text-3xl font-extrabold font-outfit text-red-300 mt-2 block">{{ number_format($stats['audit_round2_pending'] ?? 0, 0, ',', '.') }}</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Pending Items Table -->
-        <section class="glass-card rounded-3xl p-6 md:p-8 relative shadow-2xl">
-            <div class="absolute -top-px left-8 right-8 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent"></div>
-            
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <div>
-                    <h2 class="text-xl font-bold font-outfit text-slate-100 flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
-                        Menunggu Validasi ({{ $pendingItems->total() }})
-                    </h2>
-                    <p class="text-xs text-slate-400 mt-1">Tinjau hasil kerjaan teman-temanmu. Setujui, tolak, atau ubah label langsung.</p>
-                </div>
-
-                <!-- Sort, Filter & Mass Approve Toolbar -->
-                <div class="flex flex-wrap items-center gap-3">
-                    <!-- Filter & Search Form -->
-                    <form action="{{ route('admin') }}" method="GET" class="flex flex-wrap items-center gap-2">
-                        <!-- Search Box -->
-                        <div class="relative">
-                            <input type="text" name="search_pending" value="{{ $searchPending }}" placeholder="Cari ID / nama file..." class="bg-slate-900 border border-slate-700/60 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium placeholder-slate-500 w-44">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <svg class="h-3.5 w-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                            </div>
-                        </div>
-
-                        <!-- Filter Dropdown -->
-                        <select name="filter_user" onchange="this.form.submit()" class="bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium">
-                            <option value="">Semua Labeler (No Filter)</option>
-                            @foreach($pendingLabelers as $labeler)
-                                <option value="{{ $labeler }}" {{ $filterUser == $labeler ? 'selected' : '' }}>
-                                    Filter: {{ $labeler }}
-                                </option>
-                            @endforeach
-                        </select>
-
-                        <!-- Cari button -->
-                        <button type="submit" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition">
-                            Cari
-                        </button>
-
-                        @if($filterUser || $searchPending)
-                            <a href="{{ route('admin') }}" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-semibold transition" title="Reset Filter & Pencarian">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </a>
-                        @endif
-                    </form>
-
-                    <!-- Approve All Form -->
-                    <form action="{{ route('admin.approve-all') }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menyetujui semua data ini secara massal?')" class="flex items-center">
-                        @csrf
-                        @if($filterUser)
-                            <input type="hidden" name="labeled_by" value="{{ $filterUser }}">
-                        @endif
-                        @if($searchPending)
-                            <input type="hidden" name="search" value="{{ $searchPending }}">
-                        @endif
-                        <button type="submit" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-lg shadow-emerald-600/20 transform hover:-translate-y-0.5 active:translate-y-0 transition duration-150 flex items-center gap-1.5">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                            @if($filterUser && $searchPending)
-                                Setujui Semua Cocok
-                            @elseif($filterUser)
-                                Setujui Semua dari "{{ $filterUser }}"
-                            @elseif($searchPending)
-                                Setujui Hasil Pencarian
-                            @else
-                                Setujui Semua (Global)
-                            @endif
-                        </button>
-                    </form>
-
-                    <!-- Reject All Pending Form -->
-                    <form action="{{ route('admin.reject-all-pending') }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menolak semua usulan label ini secara massal? Semuanya akan kembali ke pool belum terlabel.')" class="flex items-center">
-                        @csrf
-                        @if($filterUser)
-                            <input type="hidden" name="labeled_by" value="{{ $filterUser }}">
-                        @endif
-                        @if($searchPending)
-                            <input type="hidden" name="search" value="{{ $searchPending }}">
-                        @endif
-                        <button type="submit" class="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-lg shadow-red-600/20 transform hover:-translate-y-0.5 active:translate-y-0 transition duration-150 flex items-center gap-1.5" title="Kembalikan semua usulan ini ke pool belum terlabel">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            @if($filterUser && $searchPending)
-                                Tolak Semua Cocok
-                            @elseif($filterUser)
-                                Tolak Semua dari "{{ $filterUser }}"
-                            @elseif($searchPending)
-                                Tolak Hasil Pencarian
-                            @else
-                                Tolak Semua (Global)
-                            @endif
-                        </button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Table Container -->
-            <div class="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/20">
-                <table class="w-full border-collapse text-left text-sm text-slate-300">
-                    <thead>
-                        <tr class="border-b border-slate-800 bg-slate-900/40 text-xs font-bold uppercase tracking-wider text-slate-400">
-                            <th class="py-4 px-6 w-28">Preview</th>
-                            <th class="py-4 px-6">Nama File</th>
-                            <th class="py-4 px-6">Labeler (Prodi)</th>
-                            <th class="py-4 px-6">Label Usulan</th>
-                            <th class="py-4 px-6 text-center w-72">Aksi Validasi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-800/60" id="pending-table-body">
-                        @forelse($pendingItems as $item)
-                            <tr class="hover:bg-slate-900/20 transition-colors" id="row-pending-{{ $item->id }}">
-                                <!-- Image Preview with Hover Zoom -->
-                                <td class="py-4 px-6">
-                                    <div class="relative group w-16 h-12 rounded-lg bg-slate-900 border border-slate-850 overflow-hidden flex items-center justify-center cursor-zoom-in">
-                                        <img 
-                                            src="{{ $item->url }}" 
-                                            alt="{{ $item->filename }}"
-                                            class="h-full w-full object-contain transition-transform duration-200 group-hover:scale-125"
-                                        >
-                                        <!-- Magnified Hover Overlay -->
-                                    </div>
-                                </td>
-                                <!-- Filename -->
-                                <td class="py-4 px-6 font-medium text-slate-200">
-                                    {{ $item->filename }}
-                                </td>
-                                <!-- Labeler (Prodi) -->
-                                <td class="py-4 px-6">
-                                    <div class="font-semibold text-slate-200">{{ $item->labeled_by }}</div>
-                                    <div class="text-[11px] text-slate-400 font-medium">{{ $item->prodi }}</div>
-                                </td>
-                                <!-- Proposed Label Badge -->
-                                <td class="py-4 px-6">
-                                    @if($item->label === 0)
-                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                            0 - Recycleable
-                                        </span>
-                                    @elseif($item->label === 1)
-                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                                            1 - Electronics
-                                        </span>
-                                    @elseif($item->label === 2)
-                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                                            2 - Organics
-                                        </span>
-                                    @endif
-                                </td>
-                                <!-- Actions -->
-                                <td class="py-4 px-6">
-                                    <div class="flex items-center justify-center gap-2">
-                                        <!-- Approve proposed -->
-                                        <button 
-                                            onclick="approveLabel({{ $item->id }})" 
-                                            title="Setujui Label"
-                                            class="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-400 rounded-xl transition-all duration-150 active:scale-95"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        </button>
-
-                                        <!-- Correct label to 0 -->
-                                        <button 
-                                            onclick="updateLabel({{ $item->id }}, 0)" 
-                                            title="Ubah & Setujui ke Recycleable (0)"
-                                            class="px-2 py-1 bg-slate-800 hover:bg-emerald-600/20 border border-slate-700 hover:border-emerald-500/30 text-slate-400 hover:text-emerald-400 rounded-lg text-xs font-bold transition-all"
-                                        >
-                                            Set 0
-                                        </button>
-
-                                        <!-- Correct label to 1 -->
-                                        <button 
-                                            onclick="updateLabel({{ $item->id }}, 1)" 
-                                            title="Ubah & Setujui ke Electronics (1)"
-                                            class="px-2 py-1 bg-slate-800 hover:bg-blue-600/20 border border-slate-700 hover:border-blue-500/30 text-slate-400 hover:text-blue-400 rounded-lg text-xs font-bold transition-all"
-                                        >
-                                            Set 1
-                                        </button>
-
-                                        <!-- Correct label to 2 -->
-                                        <button 
-                                            onclick="updateLabel({{ $item->id }}, 2)" 
-                                            title="Ubah & Setujui ke Organics (2)"
-                                            class="px-2 py-1 bg-slate-800 hover:bg-amber-600/20 border border-slate-700 hover:border-amber-500/30 text-slate-400 hover:text-amber-400 rounded-lg text-xs font-bold transition-all"
-                                        >
-                                            Set 2
-                                        </button>
-
-                                        <!-- Reject (revert to unlabeled) -->
-                                        <button 
-                                            onclick="rejectLabel({{ $item->id }})" 
-                                            title="Tolak Label (Kembalikan ke Pool)"
-                                            class="p-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 text-red-400 rounded-xl transition-all duration-150 active:scale-95 ml-2"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="py-12 text-center text-slate-500 font-medium">
-                                    Tidak ada data label yang perlu divalidasi. Pekerjaan teman-temanmu sudah beres!
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Pagination Links -->
-            <div class="mt-6">
-                {{ $pendingItems->appends(['approved_page' => $approvedItems->currentPage(), 'filter_user' => $filterUser, 'search_pending' => $searchPending])->links() }}
-            </div>
-
-        </section>
-
-        <!-- Approved Items Table (Recently Validated) -->
-        <section class="glass-card rounded-3xl p-6 md:p-8 relative shadow-lg">
-            <div class="absolute -top-px left-8 right-8 h-px bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent"></div>
-            
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <div>
-                    <h2 class="text-xl font-bold font-outfit text-slate-100 flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
-                        Sudah Divalidasi / Disetujui ({{ $approvedItems->total() }})
-                    </h2>
-                    <p class="text-xs text-slate-400 mt-1">Daftar label yang disetujui. Kamu bisa merevisi label jika ada kekeliruan.</p>
-                </div>
-
-                <!-- Sort, Filter & Mass Revert Toolbar -->
-                <div class="flex flex-wrap items-center gap-3">
-                    <!-- Filter & Search Form -->
-                    <form action="{{ route('admin') }}" method="GET" class="flex flex-wrap items-center gap-2">
-                        <!-- Search Box -->
-                        <div class="relative">
-                            <input type="text" name="search_approved" value="{{ $searchApproved }}" placeholder="Cari ID / nama file..." class="bg-slate-900 border border-slate-700/60 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium placeholder-slate-500 w-44">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <svg class="h-3.5 w-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                            </div>
-                        </div>
-
-                        <!-- Filter Dropdown -->
-                        <select name="filter_approved_user" onchange="this.form.submit()" class="bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium">
-                            <option value="">Semua Labeler (No Filter)</option>
-                            @foreach($approvedLabelers as $labeler)
-                                <option value="{{ $labeler }}" {{ $filterApprovedUser == $labeler ? 'selected' : '' }}>
-                                    Filter: {{ $labeler }}
-                                </option>
-                            @endforeach
-                        </select>
-
-                        <!-- Cari button -->
-                        <button type="submit" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition">
-                            Cari
-                        </button>
-
-                        @if($filterApprovedUser || $searchApproved)
-                            <a href="{{ route('admin') }}" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-semibold transition" title="Reset Filter & Pencarian">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </a>
-                        @endif
-                    </form>
-
-                    <!-- Reject All Form (Mass Revert to Pool) -->
-                    <form action="{{ route('admin.reject-all') }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan semua persetujuan data ini secara massal? Semuanya akan kembali ke pool belum terlabel.')" class="flex items-center">
-                        @csrf
-                        @if($filterApprovedUser)
-                            <input type="hidden" name="labeled_by" value="{{ $filterApprovedUser }}">
-                        @endif
-                        @if($searchApproved)
-                            <input type="hidden" name="search" value="{{ $searchApproved }}">
-                        @endif
-                        <button type="submit" class="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-lg shadow-red-600/20 transform hover:-translate-y-0.5 active:translate-y-0 transition duration-150 flex items-center gap-1.5" title="Kembalikan semua ke unlabeled pool">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Passkey Workspace</label>
+                    <p class="text-[10px] text-slate-400 leading-relaxed">Ketik passkey sendiri (alfanumerik, dash, underscore; 4–32 karakter) lalu klik <b class="text-amber-300">Simpan Passkey</b>. Atau klik <b class="text-indigo-300">Generate Random</b> untuk membuat passkey acak.</p>
+                    <div class="flex items-stretch gap-2">
+                        <input type="text" name="custom_passkey" id="custom_passkey_input" placeholder="KETIK-PASSKEY-ANDA" maxlength="32" minlength="4" pattern="[a-zA-Z0-9_\-]+" value="{{ $workspaceSetting->access_passkey ?? '' }}" class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs text-amber-200 font-mono uppercase tracking-wider focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-slate-600" autocomplete="off">
+                        <button type="button" onclick="generateRandomPasskey()" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-[11px] font-semibold transition-all whitespace-nowrap flex items-center gap-1.5" title="Buat passkey acak 8 karakter">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.2" />
                             </svg>
-                            @if($filterApprovedUser && $searchApproved)
-                                Batalkan Semua Cocok
-                            @elseif($filterApprovedUser)
-                                Batalkan Semua dari "{{ $filterApprovedUser }}"
-                            @elseif($searchApproved)
-                                Batalkan Hasil Pencarian
-                            @else
-                                Batalkan Semua (Global)
-                            @endif
+                            Random
                         </button>
-                    </form>
-                </div>
+                    </div>
+                    <button type="submit" class="w-full py-3 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Simpan Passkey
+                    </button>
+                </form>
             </div>
+        </div>
 
-            <!-- Table Container -->
-            <div class="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/10">
-                <table class="w-full border-collapse text-left text-sm text-slate-400">
-                    <thead>
-                        <tr class="border-b border-slate-800 bg-slate-900/20 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                            <th class="py-4 px-6 w-24">Preview</th>
-                            <th class="py-4 px-6">Nama File</th>
-                            <th class="py-4 px-6">Labeler (Prodi)</th>
-                            <th class="py-4 px-6">Label Disetujui</th>
-                            <th class="py-4 px-6 text-center w-60">Ubah Kembali</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-800/40" id="approved-table-body">
-                        @forelse($approvedItems as $item)
-                            <tr class="hover:bg-slate-900/10 transition-colors" id="row-approved-{{ $item->id }}">
-                                <td class="py-3 px-6">
-                                    <div class="w-14 h-10 rounded bg-slate-900 border border-slate-850 overflow-hidden flex items-center justify-center">
-                                        <img 
-                                            src="{{ $item->url }}" 
-                                            alt="{{ $item->filename }}"
-                                            class="h-full w-full object-contain"
-                                        >
-                                    </div>
-                                </td>
-                                <td class="py-3 px-6 font-medium text-slate-300">
-                                    {{ $item->filename }}
-                                </td>
-                                <td class="py-3 px-6">
-                                    <div class="font-medium text-slate-300 text-xs">{{ $item->labeled_by }}</div>
-                                    <div class="text-[10px] text-slate-500">{{ $item->prodi }}</div>
-                                </td>
-                                <td class="py-3 px-6 font-bold text-slate-200">
-                                    @if($item->label === 0)
-                                        <span class="text-emerald-400">0 - Recycleable</span>
-                                    @elseif($item->label === 1)
-                                        <span class="text-blue-400">1 - Electronics</span>
-                                    @elseif($item->label === 2)
-                                        <span class="text-amber-400">2 - Organics</span>
-                                    @endif
-                                </td>
-                                <td class="py-3 px-6">
-                                    <div class="flex items-center justify-center gap-1.5">
-                                        <button onclick="updateLabel({{ $item->id }}, 0, true)" class="px-2 py-0.5 text-[10px] bg-slate-800 border border-slate-700 hover:border-emerald-500/35 hover:text-emerald-400 rounded font-semibold transition-all">Set 0</button>
-                                        <button onclick="updateLabel({{ $item->id }}, 1, true)" class="px-2 py-0.5 text-[10px] bg-slate-800 border border-slate-700 hover:border-blue-500/35 hover:text-blue-400 rounded font-semibold transition-all">Set 1</button>
-                                        <button onclick="updateLabel({{ $item->id }}, 2, true)" class="px-2 py-0.5 text-[10px] bg-slate-800 border border-slate-700 hover:border-amber-500/35 hover:text-amber-400 rounded font-semibold transition-all">Set 2</button>
-                                        <button onclick="rejectLabel({{ $item->id }}, true)" title="Batalkan Persetujuan (Balik ke Pool)" class="p-1 bg-red-500/10 hover:bg-red-500/25 border border-red-500/20 text-red-400 rounded ml-1.5 transition-all"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="py-8 text-center text-slate-600 text-xs">
-                                    Belum ada data label yang disetujui.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+        {{-- KONTEN DINAMIS: kartu/panel berganti sesuai fase, halaman tetap sama --}}
+        @if(in_array($activeMode, ['preprocess', 'labeling'], true))
+            @include('admin.partials.' . $activeMode)
+        @else
+            <div class="glass-card rounded-3xl p-8 text-center text-slate-400 text-sm">
+                Mode aktif tidak dikenali ({{ $activeMode }}). Pilih fase di kartu Kontrol Workspace di atas.
             </div>
-
-            <!-- Pagination Links -->
-            <div class="mt-6">
-                {{ $approvedItems->appends(['pending_page' => $pendingItems->currentPage(), 'filter_approved_user' => $filterApprovedUser, 'search_approved' => $searchApproved])->links() }}
-            </div>
-        </section>
+        @endif
 
         <!-- Footer Copyright -->
         <footer class="text-center pb-8 mt-8 text-[11px] text-slate-500 font-medium tracking-wide">
-            &copy; 2026 &bull; Tim BDC Satria Data Universitas Jambi
+            &copy; 2026 &bull; Tim DATASCAPE 2026 Polban
         </footer>
     </main>
 
@@ -822,7 +261,6 @@
                 label: labelValue
             })
             .then(response => {
-                // If it is from the pending list, it gets approved, so we remove from pending list
                 const prefix = fromApproved ? 'row-approved-' : 'row-pending-';
                 const row = document.getElementById(`${prefix}${id}`);
                 if (row) {
@@ -830,7 +268,6 @@
                         row.classList.add('row-fade-out');
                         setTimeout(() => row.remove(), 400);
                     } else {
-                        // Just reload page to show correct state in approved if editing already approved
                         window.location.reload();
                         return;
                     }
@@ -845,10 +282,7 @@
 
         // Helper: refresh statistics values without full page reload
         function refreshStatsQuietly() {
-            // We can reload the page or do a quiet reload if we want, but since this is administrative,
-            // we can just let them refresh or update simple DOM elements. Let's do a quiet reload after a short delay
-            // if multiple items are processed, or let the user refresh. Actually, a simple page refresh is fine
-            // but page refresh keeps them at the correct scroll position. To make it extremely clean, let's keep it dynamic.
+            // Administrative actions — let user refresh manually if needed.
         }
 
         // Helper to update ZIP file name in input label
@@ -862,6 +296,23 @@
                 label.textContent = "Klik untuk memilih file ZIP";
                 label.classList.remove('text-indigo-400');
                 label.classList.add('text-slate-300');
+            }
+        }
+
+        // Generate random passkey (client-side) and fill the input.
+        // Server will also accept empty input and generate its own random,
+        // but we pre-fill so admin can preview before saving.
+        function generateRandomPasskey() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let out = '';
+            for (let i = 0; i < 8; i++) {
+                out += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            const input = document.getElementById('custom_passkey_input');
+            if (input) {
+                input.value = out;
+                input.classList.add('ring-1', 'ring-indigo-500');
+                setTimeout(() => input.classList.remove('ring-1', 'ring-indigo-500'), 800);
             }
         }
 
@@ -901,7 +352,7 @@
                         
                         const duration = (Date.now() - startTime) / 1000;
                         if (duration > 0) {
-                            const speed = progressEvent.loaded / duration; // bytes per second
+                            const speed = progressEvent.loaded / duration;
                             if (speed > 1024 * 1024) {
                                 speedText.textContent = (speed / (1024 * 1024)).toFixed(1) + ' MB/s';
                             } else {
@@ -918,8 +369,6 @@
                 bar.classList.remove('bg-indigo-500');
                 bar.classList.add('bg-emerald-500', 'animate-pulse');
                 
-                // Set success message in session/cookie equivalent or trigger reload
-                // Since Laravel returns redirect back with success flash, we reload to display it
                 setTimeout(() => {
                     window.location.reload();
                 }, 1500);

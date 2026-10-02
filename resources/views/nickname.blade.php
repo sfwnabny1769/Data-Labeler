@@ -35,6 +35,7 @@
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
     </style>
+@include('partials.neo')
 </head>
 <body class="min-h-screen flex items-center justify-center p-4 overflow-hidden text-slate-100 relative">
 
@@ -51,9 +52,9 @@
                 </svg>
             </div>
             <h1 class="text-4xl font-extrabold font-outfit tracking-tight bg-gradient-to-r from-indigo-200 via-slate-100 to-purple-200 bg-clip-text text-transparent">
-                Data Labeler
+                {{ config('competition.name', 'Data Labeler') }}
             </h1>
-            <p class="text-slate-400 mt-2 text-sm font-medium">Bantu kami mengklasifikasikan dataset gambar. Bantuan anda sangat berarti bagi kami</p>
+            <p class="text-slate-400 mt-2 text-sm font-medium">{{ config('competition.description', 'Bantu kami mengklasifikasikan dataset gambar. Kontribusi Anda sangat berarti bagi tim.') }}</p>
         </div>
 
         <!-- Nickname Card -->
@@ -178,7 +179,7 @@
                 </a>
             </div>
             <div class="text-[11px] text-slate-500 font-medium tracking-wide">
-                &copy; 2026 &bull; Tim BDC Satria Data Universitas Jambi
+                &copy; 2026 &bull; Tim DATASCAPE 2026 Polban
             </div>
         </div>
     </div>

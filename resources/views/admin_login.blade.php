@@ -35,6 +35,7 @@
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
     </style>
+@include('partials.neo')
 </head>
 <body class="min-h-screen flex items-center justify-center p-4 text-slate-100 relative">
 
@@ -111,7 +112,7 @@
                 </a>
             </div>
             <div class="text-[11px] text-slate-500 font-medium tracking-wide">
-                &copy; 2026 &bull; Tim BDC Satria Data Universitas Jambi
+                &copy; 2026 &bull; Tim DATASCAPE 2026 Polban
             </div>
         </div>
     </div>

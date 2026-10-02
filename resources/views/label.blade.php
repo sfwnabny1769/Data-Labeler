@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Labeler - Workspace</title>
+    <title>{{ $competitionName ?? 'Data Labeler Workspace' }}</title>
     <!-- Google Fonts: Outfit & Plus Jakarta Sans -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,7 +24,6 @@
     </script>
     <!-- Axios for HTTP Requests -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <!-- Alpine.js for smooth reactive UI (optional, but vanilla JS is fine too. Let's write vanilla JS to keep it direct and performant, with custom animations) -->
     <style>
         body {
             background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.05), transparent 45%),
@@ -43,18 +42,16 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
         .animate-fade-in {
-            animation: fadeIn 0.3s ease-out forwards;
-        }
-        .animate-fade-out {
-            animation: fadeOut 0.2s ease-in forwards;
+            animation: fadeIn 0.2s ease-out forwards;
         }
         @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.97); }
+            from { opacity: 0; transform: scale(0.98); }
             to { opacity: 1; transform: scale(1); }
         }
-        @keyframes fadeOut {
-            from { opacity: 1; transform: scale(1); }
-            to { opacity: 0; transform: scale(0.97); }
+        /* Double buffered transition */
+        .buffer-img {
+            transition: opacity 0.12s ease-in-out;
+            will-change: opacity;
         }
         /* Custom scrollbar */
         ::-webkit-scrollbar {
@@ -71,6 +68,7 @@
             background: rgba(255, 255, 255, 0.2);
         }
     </style>
+@include('partials.neo')
 </head>
 <body class="min-h-screen text-slate-100 flex flex-col relative pb-8">
 
@@ -90,8 +88,8 @@
                 </svg>
             </div>
             <div>
-                <span class="font-outfit font-bold text-lg tracking-tight bg-gradient-to-r from-indigo-200 to-purple-200 bg-clip-text text-transparent">Data Labeler</span>
-                <span class="text-[10px] uppercase font-bold tracking-widest text-indigo-400 bg-indigo-400/10 px-1.5 py-0.5 rounded ml-2">Workspace</span>
+                <span class="font-outfit font-bold text-lg tracking-tight bg-gradient-to-r from-indigo-200 to-purple-200 bg-clip-text text-transparent">{{ $competitionName ?? 'Data Labeler' }}</span>
+                <span class="text-[10px] uppercase font-bold tracking-widest text-indigo-400 bg-indigo-400/10 px-1.5 py-0.5 rounded ml-2">Zero-Latency Workspace</span>
             </div>
         </div>
         
@@ -101,7 +99,7 @@
                 <span class="text-xs font-semibold text-slate-300">Halo, <span class="text-white font-bold">{{ $nickname }}</span> <span class="text-slate-400 text-[11px] ml-1">({{ $prodi }})</span></span>
             </div>
             
-            <form action="{{ route('nickname.logout') }}" method="POST" class="inline">
+            <form action="{{ route('nickname.logout') }}" method="POST" class="inline" onsubmit="releaseHeldLeases()">
                 @csrf
                 <button type="submit" class="text-xs font-semibold text-slate-400 hover:text-red-400 transition-colors duration-200">
                     Keluar
@@ -133,100 +131,105 @@
             </div>
 
             <!-- Workspace Card -->
-            <div class="glass-card rounded-3xl p-6 md:p-8 flex flex-col items-center justify-between min-h-[500px] relative shadow-2xl">
+            <div class="glass-card rounded-3xl p-6 md:p-8 flex flex-col items-center justify-between min-h-[520px] relative shadow-2xl">
                 <!-- Top subtle border -->
                 <div class="absolute -top-px left-8 right-8 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent"></div>
 
                 <!-- Alert Message -->
-                <div id="alert-box" class="hidden absolute top-4 left-4 right-4 z-20 p-3.5 rounded-xl border text-sm font-semibold transition-all duration-300 flex items-center gap-2">
-                    <!-- Icon inject dynamically -->
+                <div id="alert-box" class="hidden absolute top-4 left-4 right-4 z-30 p-3.5 rounded-xl border text-sm font-semibold transition-all duration-300 flex items-center gap-2">
                     <span id="alert-msg"></span>
                 </div>
 
-                <!-- Image Frame Container -->
-                <div class="w-full flex-grow flex items-center justify-center min-h-[300px] mb-6 relative rounded-2xl bg-slate-950/40 border border-slate-800/80 overflow-hidden group">
+                <!-- Image Frame Container (Double-Buffered for Instant 0ms Swap) -->
+                <div class="w-full flex-grow flex items-center justify-center min-h-[340px] mb-6 relative rounded-2xl bg-slate-950/40 border border-slate-800/80 overflow-hidden group">
                     
-                    <!-- Loading Spinner -->
-                    <div id="image-loader" class="absolute inset-0 bg-slate-900/80 flex flex-col items-center justify-center gap-3 transition-opacity duration-300">
+                    <!-- Top Status Badges: Buffer Count & Sync Status -->
+                    <div class="absolute top-3 right-3 z-20 flex items-center gap-2">
+                        <!-- Outbox Sync Pill -->
+                        <div id="sync-badge" class="px-2.5 py-1 rounded-full bg-slate-900/80 backdrop-blur border border-slate-700/60 text-[10px] font-semibold text-emerald-300 flex items-center gap-1.5 shadow-sm">
+                            <span id="sync-dot" class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                            <span id="sync-text">Tersinkron</span>
+                        </div>
+
+                        <!-- Client Buffer Pill -->
+                        <div id="buffer-badge" class="px-2.5 py-1 rounded-full bg-slate-900/80 backdrop-blur border border-slate-700/60 text-[10px] font-semibold text-indigo-300 flex items-center gap-1.5 shadow-sm" title="Gambar yang sudah di-cache dalam memori browser">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
+                            <span id="buffer-text">Buffer: 0</span>
+                        </div>
+                    </div>
+
+                    <!-- Loading Spinner (hanya muncul saat buffer awal kosong) -->
+                    <div id="image-loader" class="absolute inset-0 bg-slate-900/80 flex flex-col items-center justify-center gap-3 transition-opacity duration-200 z-10">
                         <div class="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                        <p class="text-xs font-medium text-indigo-300">Memuat gambar...</p>
+                        <p class="text-xs font-medium text-indigo-300">Menyiapkan antrean gambar...</p>
                     </div>
 
                     <!-- Complete Screen (Hidden initially) -->
-                    <div id="complete-screen" class="hidden absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-8 text-center">
+                    <div id="complete-screen" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-8 text-center z-30">
                         <div class="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mb-6">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                             </svg>
                         </div>
-                        <h3 class="text-2xl font-extrabold font-outfit text-slate-100">Semua Gambar Selesai Dilabel!</h3>
-                        <p class="text-slate-400 mt-2 max-w-sm text-sm">Hebat! Semua dataset di folder telah berhasil dilabeli oleh kamu dan teman-temanmu. Silakan tunggu admin menyinkronkan gambar baru atau mengunduh hasilnya.</p>
-                        <button onclick="fetchNextImage()" class="mt-6 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl transition-all duration-200 border border-slate-700">
-                            Coba Segarkan
+                        <h3 class="text-2xl font-extrabold font-outfit text-white"  >Semua Gambar Selesai Dilabel!</h3>
+                        <p class="text-slate-400 mt-2 max-w-sm text-white" >Semua dataset di folder telah berhasil dilabeli. Jika masih ada gambar yang tertahan di sesi lain, Anda bisa mencoba menyegarkan antrean.</p>
+                        <button onclick="replenishBuffer(true)" class="mt-6 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl transition-all duration-200 border border-slate-700 cursor-pointer">
+                            Segarkan Antrean Buffer
                         </button>
                     </div>
 
-                    <!-- Active Image Element -->
+                    <!-- Double-Buffered Images (Swap instantly with zero perceptible latency) -->
                     <img 
-                        id="target-image" 
+                        id="target-image-a" 
                         src="" 
-                        alt="Label Target" 
-                        class="hidden max-h-[380px] max-w-full object-contain select-none transition-transform duration-300 group-hover:scale-[1.02]"
-                        onload="imageLoaded()"
-                        onerror="imageError()"
+                        alt="Label Target A" 
+                        class="buffer-img absolute max-h-[360px] max-w-full object-contain select-none opacity-0"
+                    >
+                    <img 
+                        id="target-image-b" 
+                        src="" 
+                        alt="Label Target B" 
+                        class="buffer-img absolute max-h-[360px] max-w-full object-contain select-none opacity-0"
                     >
                 </div>
 
-                <!-- Interaction / Label Selection Section -->
+                <!-- Interaction / Label Selection Section (Generated dynamically from $classes) -->
                 <div id="label-controls" class="w-full">
                     <p class="text-center text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Pilih Label Klasifikasi</p>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <!-- Label 0: Recycleable -->
-                        <button 
-                            onclick="submitLabel(0)" 
-                            class="group relative flex flex-col items-center justify-center p-4 bg-gradient-to-br from-emerald-500/10 to-teal-600/5 hover:from-emerald-500/20 hover:to-teal-600/15 border border-emerald-500/20 hover:border-emerald-500/40 rounded-2xl transition-all duration-200 active:scale-95 text-center shadow-lg hover:shadow-emerald-500/5"
-                        >
-                            <span class="absolute top-2.5 right-3 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono select-none">Q / 1</span>
-                            <div class="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.2" />
-                                </svg>
-                            </div>
-                            <span class="font-bold text-sm text-slate-200">Recycleable</span>
-                            <span class="text-[10px] text-slate-400 mt-1">Daur Ulang (Label: 0)</span>
-                        </button>
-
-                        <!-- Label 1: Electronics -->
-                        <button 
-                            onclick="submitLabel(1)" 
-                            class="group relative flex flex-col items-center justify-center p-4 bg-gradient-to-br from-blue-500/10 to-indigo-600/5 hover:from-blue-500/20 hover:to-indigo-600/15 border border-blue-500/20 hover:border-blue-500/40 rounded-2xl transition-all duration-200 active:scale-95 text-center shadow-lg hover:shadow-blue-500/5"
-                        >
-                            <span class="absolute top-2.5 right-3 text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono select-none">W / 2</span>
-                            <div class="w-10 h-10 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                            </div>
-                            <span class="font-bold text-sm text-slate-200">Electronics</span>
-                            <span class="text-[10px] text-slate-400 mt-1">Elektronik (Label: 1)</span>
-                        </button>
-
-                        <!-- Label 2: Organics -->
-                        <button 
-                            onclick="submitLabel(2)" 
-                            class="group relative flex flex-col items-center justify-center p-4 bg-gradient-to-br from-amber-500/10 to-orange-600/5 hover:from-amber-500/20 hover:to-orange-600/15 border border-amber-500/20 hover:border-amber-500/40 rounded-2xl transition-all duration-200 active:scale-95 text-center shadow-lg hover:shadow-amber-500/5"
-                        >
-                            <span class="absolute top-2.5 right-3 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono select-none">E / 3</span>
-                            <div class="w-10 h-10 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                                </svg>
-                            </div>
-                            <span class="font-bold text-sm text-slate-200">Organics</span>
-                            <span class="text-[10px] text-slate-400 mt-1">Organik (Label: 2)</span>
-                        </button>
+                    <div class="grid grid-cols-1 md:grid-cols-{{ max(1, min(4, count($classes))) }} gap-4">
+                        @foreach($classes as $cls)
+                            @php
+                                $color = $cls['color'] ?? 'indigo';
+                            @endphp
+                            <button 
+                                type="button"
+                                onclick="submitLabel({{ $cls['id'] }})" 
+                                class="group relative flex flex-col items-center justify-center p-4 bg-gradient-to-br from-{{ $color }}-500/10 to-slate-900/40 hover:from-{{ $color }}-500/20 hover:to-slate-900/60 border border-{{ $color }}-500/20 hover:border-{{ $color }}-500/40 rounded-2xl transition-all duration-150 active:scale-95 text-center shadow-lg hover:shadow-{{ $color }}-500/10 cursor-pointer"
+                            >
+                                <span class="absolute top-2.5 right-3 text-[10px] font-bold px-1.5 py-0.5 rounded bg-{{ $color }}-500/20 text-{{ $color }}-300 font-mono select-none">
+                                    {{ $cls['shortcut_label'] }}
+                                </span>
+                                <div class="w-10 h-10 rounded-full bg-{{ $color }}-500/15 text-{{ $color }}-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform font-bold font-mono text-sm">
+                                    {{ $cls['id'] }}
+                                </div>
+                                <span class="font-bold text-sm text-slate-200">{{ $cls['name'] }}</span>
+                                <span class="text-[10px] text-slate-400 mt-1">{{ $cls['badge'] ?? $cls['desc'] }}</span>
+                            </button>
+                        @endforeach
                     </div>
+
+                    <button
+                        type="button"
+                        onclick="skipImage()"
+                        class="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-slate-800/70 hover:bg-slate-700/80 border border-slate-700 hover:border-slate-600 rounded-2xl text-xs font-semibold text-slate-300 transition-all duration-200 active:scale-[0.99] cursor-pointer"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M4 12h16" />
+                        </svg>
+                        Lewati Gambar
+                        <span class="text-[10px] text-slate-500">(S)</span>
+                    </button>
                 </div>
 
             </div>
@@ -235,7 +238,7 @@
         <!-- Right Column: Guidelines & Leaderboard (4 Cols) -->
         <section class="lg:col-span-4 flex flex-col gap-6">
             
-            <!-- Guideline Box -->
+            <!-- Guideline Box (Dynamic per competition class) -->
             <div class="glass-card rounded-3xl p-6 relative">
                 <div class="absolute -top-px left-6 right-6 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent"></div>
                 <h3 class="font-outfit font-bold text-lg mb-4 flex items-center gap-2 text-slate-100">
@@ -246,80 +249,35 @@
                 </h3>
                 
                 <div class="space-y-4">
-                    <!-- Recycleable Info -->
-                    <div class="flex flex-col bg-slate-900/40 border border-slate-800/80 rounded-xl p-3">
-                        <div class="flex gap-3">
-                            <span class="w-1.5 h-auto bg-emerald-500 rounded-full flex-shrink-0"></span>
-                            <div>
-                                <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wide">Recycleable (0)</h4>
-                                <p class="text-xs text-slate-400 mt-1">Sampah yang bisa didaur ulang. Contoh: Botol plastik, kardus bekas, kaleng minuman, kertas, koran, botol beling.</p>
+                    @foreach($classes as $cls)
+                        @php
+                            $lbl = $cls['id'];
+                            $color = $cls['color'] ?? 'indigo';
+                        @endphp
+                        <div class="flex flex-col bg-slate-900/40 border border-slate-800/80 rounded-xl p-3">
+                            <div class="flex gap-3">
+                                <span class="w-1.5 h-auto bg-{{ $color }}-500 rounded-full flex-shrink-0"></span>
+                                <div>
+                                    <h4 class="text-xs font-bold text-{{ $color }}-400 uppercase tracking-wide">{{ $cls['name'] }} ({{ $lbl }})</h4>
+                                    <p class="text-xs text-slate-400 mt-1">{{ $cls['desc'] }}</p>
+                                </div>
                             </div>
+                            @if(!empty($examples[$lbl]))
+                                <div class="grid grid-cols-4 gap-1.5 mt-2.5 ml-4.5 pl-3 example-slideshow-container" data-label="{{ $lbl }}" data-images="{{ json_encode($examples[$lbl]) }}">
+                                    @foreach(array_slice($examples[$lbl], 0, 4) as $index => $imgUrl)
+                                        <div class="relative group aspect-square rounded-lg bg-slate-950/40 border border-slate-800/80 overflow-hidden cursor-zoom-in">
+                                            <img 
+                                                id="example-{{ $lbl }}-slot-{{ $index }}"
+                                                src="{{ $imgUrl }}" 
+                                                class="w-full h-full object-cover transition-all duration-500 group-hover:scale-110 opacity-100" 
+                                                onclick="showLightbox(this.src)"
+                                            >
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
-                        @if(!empty($examples[0]))
-                            <div class="grid grid-cols-4 gap-1.5 mt-2.5 ml-4.5 pl-3 example-slideshow-container" data-label="0" data-images="{{ json_encode($examples[0]) }}">
-                                @foreach(array_slice($examples[0], 0, 4) as $index => $imgUrl)
-                                    <div class="relative group aspect-square rounded-lg bg-slate-950/40 border border-slate-800/80 overflow-hidden cursor-zoom-in">
-                                        <img 
-                                            id="example-0-slot-{{ $index }}"
-                                            src="{{ $imgUrl }}" 
-                                            class="w-full h-full object-cover transition-all duration-500 group-hover:scale-110 opacity-100" 
-                                            onclick="showLightbox(this.src)"
-                                        >
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-                    </div>
-
-                    <!-- Electronics Info -->
-                    <div class="flex flex-col bg-slate-900/40 border border-slate-800/80 rounded-xl p-3">
-                        <div class="flex gap-3">
-                            <span class="w-1.5 h-auto bg-blue-500 rounded-full flex-shrink-0"></span>
-                            <div>
-                                <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wide">Electronics (1)</h4>
-                                <p class="text-xs text-slate-400 mt-1">Komponen elektronik & e-waste. Contoh: Kabel rusak, HP, baterai bekas, keyboard, mouse, charger, bohlam.</p>
-                            </div>
-                        </div>
-                        @if(!empty($examples[1]))
-                            <div class="grid grid-cols-4 gap-1.5 mt-2.5 ml-4.5 pl-3 example-slideshow-container" data-label="1" data-images="{{ json_encode($examples[1]) }}">
-                                @foreach(array_slice($examples[1], 0, 4) as $index => $imgUrl)
-                                    <div class="relative group aspect-square rounded-lg bg-slate-950/40 border border-slate-800/80 overflow-hidden cursor-zoom-in">
-                                        <img 
-                                            id="example-1-slot-{{ $index }}"
-                                            src="{{ $imgUrl }}" 
-                                            class="w-full h-full object-cover transition-all duration-500 group-hover:scale-110 opacity-100" 
-                                            onclick="showLightbox(this.src)"
-                                        >
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-                    </div>
-
-                    <!-- Organics Info -->
-                    <div class="flex flex-col bg-slate-900/40 border border-slate-800/80 rounded-xl p-3">
-                        <div class="flex gap-3">
-                            <span class="w-1.5 h-auto bg-amber-500 rounded-full flex-shrink-0"></span>
-                            <div>
-                                <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wide">Organics (2)</h4>
-                                <p class="text-xs text-slate-400 mt-1">Sampah organik / mudah terurai. Contoh: Sisa makanan, kulit buah, potongan sayur, dedaunan gugur, cangkang telur.</p>
-                            </div>
-                        </div>
-                        @if(!empty($examples[2]))
-                            <div class="grid grid-cols-4 gap-1.5 mt-2.5 ml-4.5 pl-3 example-slideshow-container" data-label="2" data-images="{{ json_encode($examples[2]) }}">
-                                @foreach(array_slice($examples[2], 0, 4) as $index => $imgUrl)
-                                    <div class="relative group aspect-square rounded-lg bg-slate-950/40 border border-slate-800/80 overflow-hidden cursor-zoom-in">
-                                        <img 
-                                            id="example-2-slot-{{ $index }}"
-                                            src="{{ $imgUrl }}" 
-                                            class="w-full h-full object-cover transition-all duration-500 group-hover:scale-110 opacity-100" 
-                                            onclick="showLightbox(this.src)"
-                                        >
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-                    </div>
+                    @endforeach
                 </div>
             </div>
 
@@ -338,7 +296,6 @@
 
                 <!-- Leaderboard list container -->
                 <div class="flex-grow flex flex-col gap-2 overflow-y-auto max-h-[320px] pr-1" id="leaderboard-list">
-                    <!-- Dynamic updates inject here -->
                     <div class="py-12 text-center text-slate-500 text-xs font-medium">Memuat peringkat...</div>
                 </div>
             </div>
@@ -348,52 +305,56 @@
 
     <!-- Footer Copyright -->
     <footer class="text-center pb-8 mt-4 text-[11px] text-slate-500 font-medium tracking-wide z-10">
-        &copy; 2026 &bull; Tim BDC Satria Data Universitas Jambi
+        &copy; 2026 &bull; Tim DATASCAPE 2026 Polban &bull; Optimized Zero-Latency Engine
     </footer>
 
-    <!-- Interactive JS Script -->
+    <!-- Interactive JS Script with Zero-Latency Buffer & Outbox Pattern -->
     <script>
         // Setup Axios default headers
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken;
 
-        let activeImageId = null;
-        let isSubmitting = false;
+        // Configuration
+        const BATCH_SIZE = {{ $batchSize ?? 6 }};
+        const COMPETITION_CLASSES = @json($classes);
 
-        // Run on page load
+        // State Machine
+        let imageBuffer = [];       // In-memory buffer of pre-decoded images: [{ id, filename, url, preloadedImg }]
+        let activeItem = null;      // Currently active image item
+        let activeSlot = 'a';       // Double-buffering active element slot ('a' or 'b')
+        let isAllocating = false;   // Network allocation lock
+        let outboxQueue = [];       // Background submission queue
+        let isProcessingOutbox = false;
+        let isBufferExhausted = false;
+
         document.addEventListener('DOMContentLoaded', () => {
-            fetchNextImage();
+            // Initial buffer load
+            replenishBuffer(true);
             updateLeaderboard();
-            // Poll leaderboard every 5 seconds
-            setInterval(updateLeaderboard, 5000);
 
-            // Initialize Example Slideshows (cycles through examples if there are more than 4)
+            // Periodic Leaderboard & Heartbeat
+            setInterval(updateLeaderboard, 5000);
+            setInterval(sendLeaseHeartbeat, 40000); // 40s heartbeat to keep leases alive
+
+            // Initialize Example Slideshows
             const containers = document.querySelectorAll('.example-slideshow-container');
             containers.forEach(container => {
                 const label = container.getAttribute('data-label');
                 const allImages = JSON.parse(container.getAttribute('data-images'));
                 
                 if (allImages.length <= 4) return;
-
-                // Track currently displayed images in slots
                 let activeImages = allImages.slice(0, 4);
                 
-                // Stagger interval offset slightly
                 setTimeout(() => {
                     setInterval(() => {
-                        // Pick a random slot to fade/replace
                         const slotIndex = Math.floor(Math.random() * 4);
                         const imgEl = document.getElementById(`example-${label}-slot-${slotIndex}`);
                         if (!imgEl) return;
 
-                        // Filter images not currently visible
                         const availableImages = allImages.filter(img => !activeImages.includes(img));
                         if (availableImages.length === 0) return;
 
-                        // Select a random new image
                         const newImage = availableImages[Math.floor(Math.random() * availableImages.length)];
-
-                        // Smooth cross-fade transition
                         imgEl.classList.replace('opacity-100', 'opacity-0');
 
                         setTimeout(() => {
@@ -401,156 +362,323 @@
                             activeImages[slotIndex] = newImage;
                             imgEl.classList.replace('opacity-0', 'opacity-100');
                         }, 500);
-
                     }, 3500);
                 }, Math.random() * 2000);
             });
 
-            // Bind keyboard shortcuts
+            // Dynamic Keyboard Shortcut Bindings
             document.addEventListener('keydown', (e) => {
-                // Return if complete screen is showing or user is typing in an input
                 if (document.getElementById('complete-screen').classList.contains('hidden') === false) return;
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-                // Support both (0, 1, 2) keys and (1, 2, 3 / Q, W, E) keys
-                if (e.key === '0' || e.key === '1' || e.key === 'q' || e.key === 'Q') {
-                    submitLabel(0);
-                } else if (e.key === '2' || e.key === 'w' || e.key === 'W') {
-                    submitLabel(1);
-                } else if (e.key === '3' || e.key === 'e' || e.key === 'E') {
-                    submitLabel(2);
+                if (e.key === 's' || e.key === 'S') {
+                    skipImage();
+                    return;
+                }
+
+                for (const cls of COMPETITION_CLASSES) {
+                    if (cls.keys && cls.keys.includes(e.key)) {
+                        submitLabel(cls.id);
+                        return;
+                    }
                 }
             });
         });
 
-        // Fetch Next Image
-        function fetchNextImage() {
-            showLoader(true);
-            hideAlert();
+        /**
+         * Replenish the in-memory client buffer via batch allocation API.
+         */
+        function replenishBuffer(forceImmediate = false) {
+            if (isAllocating) return;
+            if (!forceImmediate && imageBuffer.length >= 4) return;
 
-            axios.get('{{ route("api.next-image") }}')
-                .then(response => {
-                    const data = response.data;
-                    
-                    // Update Stat HUDs
-                    document.getElementById('stat-left').textContent = formatNumber(data.total_left);
-                    document.getElementById('stat-total').textContent = formatNumber(data.total_labeled);
-                    document.getElementById('stat-user').textContent = formatNumber(data.user_labeled);
-
-                    if (data.completed) {
-                        showCompleteScreen(true);
-                        showLoader(false);
-                        activeImageId = null;
-                    } else {
-                        showCompleteScreen(false);
-                        activeImageId = data.image.id;
-                        
-                        const imgEl = document.getElementById('target-image');
-                        imgEl.src = data.image.url;
-                        // Onload triggers imageLoaded() which turns off the loader
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching image:', error);
-                    showAlert('Gagal mengambil gambar berikutnya. Silakan segarkan halaman.', 'danger');
-                    showLoader(false);
-                });
-        }
-
-        // Image loaded successfully
-        function imageLoaded() {
-            const imgEl = document.getElementById('target-image');
-            imgEl.classList.remove('hidden');
-            imgEl.classList.remove('animate-fade-out');
-            imgEl.classList.add('animate-fade-in');
-            showLoader(false);
-        }
-
-        // Image loading error
-        function imageError() {
-            showLoader(false);
-            showAlert('Gagal memuat gambar. Kemungkinan file di local folder D:\\SATRIA DATA\\test tidak dapat diakses atau sudah dipindahkan.', 'danger');
-        }
-
-        // Helper: Format large numbers
-        function formatNumber(num) {
-            return num !== undefined && num !== null ? num.toLocaleString('id-ID') : '-';
-        }
-
-        // Helper: Show/Hide Loader
-        function showLoader(show) {
-            const loader = document.getElementById('image-loader');
-            if (show) {
-                loader.style.opacity = '1';
-                loader.style.pointerEvents = 'auto';
-            } else {
-                loader.style.opacity = '0';
-                loader.style.pointerEvents = 'none';
+            isAllocating = true;
+            if (imageBuffer.length === 0 && !activeItem) {
+                showLoader(true);
             }
-        }
 
-        // Helper: Show/Hide Complete Screen
-        function showCompleteScreen(show) {
-            const cs = document.getElementById('complete-screen');
-            const controls = document.getElementById('label-controls');
-            const img = document.getElementById('target-image');
+            const currentIds = imageBuffer.map(item => item.id);
+            if (activeItem) currentIds.push(activeItem.id);
 
-            if (show) {
-                cs.classList.remove('hidden');
-                controls.classList.add('opacity-40');
-                controls.classList.add('pointer-events-none');
-                img.classList.add('hidden');
-            } else {
-                cs.classList.add('hidden');
-                controls.classList.remove('opacity-40');
-                controls.classList.remove('pointer-events-none');
-            }
-        }
-
-        // Submit Label
-        function submitLabel(labelValue) {
-            if (!activeImageId || isSubmitting) return;
-
-            isSubmitting = true;
-            const imgEl = document.getElementById('target-image');
-            
-            // Fade out the current image before request finishes to feel snappy!
-            imgEl.classList.remove('animate-fade-in');
-            imgEl.classList.add('animate-fade-out');
-
-            axios.post('{{ route("api.submit-label") }}', {
-                image_id: activeImageId,
-                label: labelValue
+            axios.get('{{ route("api.batch-images") }}', {
+                params: {
+                    count: BATCH_SIZE,
+                    exclude_ids: currentIds
+                }
             })
             .then(response => {
-                isSubmitting = false;
-                // Fetch next image
-                fetchNextImage();
-                // Refresh leaderboard
-                updateLeaderboard();
-            })
-            .catch(error => {
-                isSubmitting = false;
-                imgEl.classList.remove('animate-fade-out');
-                imgEl.classList.add('animate-fade-in');
+                const data = response.data;
+                isAllocating = false;
+                updateStats(data);
 
-                if (error.response && error.response.status === 409) {
-                    // Conflicted: someone else labeled it
-                    showAlert(error.response.data.error, 'warning');
-                    setTimeout(fetchNextImage, 2000);
+                if (data.images && data.images.length > 0) {
+                    isBufferExhausted = false;
+                    data.images.forEach(imgData => {
+                        // Pre-decode bitmap directly in browser memory
+                        const preloaded = new Image();
+                        preloaded.src = imgData.url;
+                        if (preloaded.decode) {
+                            preloaded.decode().catch(() => {});
+                        }
+
+                        imageBuffer.push({
+                            id: imgData.id,
+                            filename: imgData.filename,
+                            url: imgData.url,
+                            imgObj: preloaded
+                        });
+                    });
+
+                    updateBufferBadge();
+
+                    // If we didn't have an active image displayed, advance immediately
+                    if (!activeItem) {
+                        advanceToNext();
+                    }
+                } else if (data.completed && imageBuffer.length === 0 && !activeItem) {
+                    showCompleteScreen(true);
+                    showLoader(false);
+                } else if (imageBuffer.length === 0 && !activeItem) {
+                    // Temporarily no images in pool
+                    showCompleteScreen(true);
+                    showLoader(false);
+                }
+            })
+            .catch(err => {
+                console.error('Error replenishing image buffer:', err);
+                isAllocating = false;
+                showLoader(false);
+            });
+        }
+
+        /**
+         * Switch instantly to the next image in the local buffer (0ms delay).
+         */
+        function advanceToNext() {
+            hideAlert();
+
+            if (imageBuffer.length === 0) {
+                activeItem = null;
+                showLoader(true);
+                replenishBuffer(true);
+                return;
+            }
+
+            const nextItem = imageBuffer.shift();
+            activeItem = nextItem;
+            updateBufferBadge();
+
+            // Double buffering switch: Swap image elements without white flash
+            const currentSlot = activeSlot;
+            const nextSlot = (currentSlot === 'a' ? 'b' : 'a');
+            activeSlot = nextSlot;
+
+            const currentEl = document.getElementById(`target-image-${currentSlot}`);
+            const nextEl = document.getElementById(`target-image-${nextSlot}`);
+
+            nextEl.src = nextItem.url;
+            nextEl.style.opacity = '1';
+            currentEl.style.opacity = '0';
+
+            showLoader(false);
+            showCompleteScreen(false);
+
+            // Auto-replenish in background if buffer drops below threshold
+            if (imageBuffer.length <= 3) {
+                replenishBuffer();
+            }
+        }
+
+        /**
+         * Submit label with optimistic 0ms UI advance + background outbox queue.
+         */
+        function submitLabel(labelValue) {
+            if (!activeItem) return;
+
+            const itemToSubmit = activeItem;
+
+            // 1. Immediately advance to next image in buffer (0ms UI latency!)
+            advanceToNext();
+
+            // 2. Optimistically increment user contribution counter
+            const userStatEl = document.getElementById('stat-user');
+            if (userStatEl) {
+                const currentVal = parseInt(userStatEl.textContent.replace(/\D/g, '')) || 0;
+                userStatEl.textContent = formatNumber(currentVal + 1);
+            }
+
+            // 3. Enqueue to background outbox for network resilience
+            outboxQueue.push({
+                image_id: itemToSubmit.id,
+                label: labelValue,
+                attempts: 0
+            });
+
+            processOutbox();
+        }
+
+        /**
+         * Process outbox queue asynchronously with auto-retry on network glitches.
+         */
+        function processOutbox() {
+            if (isProcessingOutbox || outboxQueue.length === 0) return;
+
+            isProcessingOutbox = true;
+            updateSyncBadge('syncing');
+
+            const item = outboxQueue[0];
+
+            axios.post('{{ route("api.submit-label") }}', {
+                image_id: item.image_id,
+                label: item.label
+            })
+            .then(res => {
+                outboxQueue.shift(); // Succeeded, remove from queue
+                isProcessingOutbox = false;
+
+                if (outboxQueue.length > 0) {
+                    processOutbox();
                 } else {
-                    showAlert('Gagal mengirimkan label. Silakan coba lagi.', 'danger');
-                    console.error('Error submitting label:', error);
+                    updateSyncBadge('synced');
+                    updateLeaderboard();
+                }
+            })
+            .catch(err => {
+                item.attempts++;
+                console.warn('Outbox submit warning (will retry):', err);
+
+                if (err.response && err.response.status === 409) {
+                    // Conflicted: someone else labeled it
+                    outboxQueue.shift();
+                    isProcessingOutbox = false;
+                    showAlert('Catatan: Gambar ini telah dilabeli oleh anggota tim lain.', 'warning');
+                    processOutbox();
+                } else if (item.attempts < 4) {
+                    // Retry with exponential backoff
+                    setTimeout(() => {
+                        isProcessingOutbox = false;
+                        processOutbox();
+                    }, item.attempts * 1200);
+                } else {
+                    // Give up this single item after 4 retries
+                    outboxQueue.shift();
+                    isProcessingOutbox = false;
+                    showAlert('Koneksi sempat terputus. Label dilewati.', 'danger');
+                    processOutbox();
                 }
             });
         }
 
-        // Update Leaderboard via AJAX
+        /**
+         * Skip current image and advance to next.
+         */
+        function skipImage() {
+            if (!activeItem) return;
+            advanceToNext();
+        }
+
+        /**
+         * Keep alive active leases while the tab remains open.
+         */
+        function sendLeaseHeartbeat() {
+            const heldIds = [];
+            if (activeItem) heldIds.push(activeItem.id);
+            imageBuffer.forEach(item => heldIds.push(item.id));
+
+            if (heldIds.length === 0) return;
+
+            axios.post('{{ route("api.heartbeat-lease") }}', {
+                image_ids: heldIds
+            }).catch(() => {});
+        }
+
+        /**
+         * Gracefully release un-labeled leases when the user closes or exits the tab.
+         */
+        function releaseHeldLeases() {
+            const heldIds = [];
+            if (activeItem) heldIds.push(activeItem.id);
+            imageBuffer.forEach(item => heldIds.push(item.id));
+
+            if (heldIds.length === 0) return;
+
+            const payload = JSON.stringify({
+                _token: csrfToken,
+                nickname: '{{ $nickname }}',
+                image_ids: heldIds
+            });
+
+            // navigator.sendBeacon is guaranteed by browsers to finish even when page unloads
+            if (navigator.sendBeacon) {
+                const blob = new Blob([payload], { type: 'application/json' });
+                navigator.sendBeacon('{{ route("api.release-lease") }}', blob);
+            }
+        }
+
+        window.addEventListener('beforeunload', releaseHeldLeases);
+
+        /**
+         * Update buffer counter badge.
+         */
+        function updateBufferBadge() {
+            const badge = document.getElementById('buffer-text');
+            if (badge) {
+                badge.textContent = `Buffer: ${imageBuffer.length}`;
+            }
+        }
+
+        /**
+         * Update sync status pill.
+         */
+        function updateSyncBadge(status) {
+            const dot = document.getElementById('sync-dot');
+            const text = document.getElementById('sync-text');
+
+            if (status === 'syncing') {
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping';
+                text.textContent = `Menyimpan (${outboxQueue.length})...`;
+                text.className = 'text-amber-300';
+            } else {
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400';
+                text.textContent = 'Tersinkron';
+                text.className = 'text-emerald-300';
+            }
+        }
+
+        function updateStats(data) {
+            document.getElementById('stat-left').textContent = formatNumber(data.total_left);
+            document.getElementById('stat-total').textContent = formatNumber(data.total_labeled);
+            document.getElementById('stat-user').textContent = formatNumber(data.user_labeled);
+        }
+
+        function showLoader(show) {
+            const loader = document.getElementById('image-loader');
+            if (loader) {
+                loader.style.opacity = show ? '1' : '0';
+                loader.style.pointerEvents = show ? 'auto' : 'none';
+            }
+        }
+
+        function showCompleteScreen(show) {
+            const cs = document.getElementById('complete-screen');
+            const controls = document.getElementById('label-controls');
+            if (!cs || !controls) return;
+
+            if (show) {
+                cs.classList.remove('hidden');
+                controls.classList.add('opacity-40', 'pointer-events-none');
+            } else {
+                cs.classList.add('hidden');
+                controls.classList.remove('opacity-40', 'pointer-events-none');
+            }
+        }
+
         function updateLeaderboard() {
             axios.get('{{ route("api.leaderboard") }}')
                 .then(response => {
                     const leaderboard = response.data;
                     const container = document.getElementById('leaderboard-list');
+                    if (!container) return;
                     container.innerHTML = '';
 
                     if (leaderboard.length === 0) {
@@ -597,14 +725,14 @@
                 });
         }
 
-        // Helper: Alert Display
         function showAlert(message, type) {
             const alertBox = document.getElementById('alert-box');
             const alertMsg = document.getElementById('alert-msg');
-            
+            if (!alertBox || !alertMsg) return;
+
             alertMsg.textContent = message;
-            alertBox.classList.remove('hidden', 'bg-red-500/15', 'border-red-500/35', 'text-red-400', 'bg-amber-500/15', 'border-amber-500/35', 'text-amber-400');
-            
+            alertBox.classList.remove('hidden', 'bg-red-500/15', 'border-red-500/35', 'text-red-400', 'bg-amber-500/15', 'border-amber-500/35', 'text-amber-400', 'bg-indigo-500/15', 'border-indigo-500/35', 'text-indigo-300');
+
             if (type === 'danger') {
                 alertBox.classList.add('bg-red-500/15', 'border-red-500/35', 'text-red-400');
             } else if (type === 'warning') {
@@ -615,20 +743,20 @@
         }
 
         function hideAlert() {
-            document.getElementById('alert-box').classList.add('hidden');
+            const alertBox = document.getElementById('alert-box');
+            if (alertBox) alertBox.classList.add('hidden');
         }
 
-        // Helper: Escape HTML to avoid XSS in live polling names
+        function formatNumber(num) {
+            return num !== undefined && num !== null ? num.toLocaleString('id-ID') : '-';
+        }
+
         function escapeHtml(str) {
-            return str
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
 
-        // Lightbox Functions for Guideline Examples
+        // Lightbox
         function showLightbox(imgUrl) {
             const modal = document.getElementById('lightbox-modal');
             const img = document.getElementById('lightbox-img');

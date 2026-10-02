@@ -1,9 +1,15 @@
+@deprecated
+{{-- File ini sudah DEPRECATED. Konten audit sudah dilebur ke halaman admin
+     utama via partial resources/views/admin/partials/preprocess.blade.php.
+     Route /admin/audit sekarang redirect ke /admin. File dipertahankan
+     hanya untuk referensi; akan dihapus setelah diverifikasi tidak ada
+     referensi tersisa. --}}
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Labeler - Admin Audit Dashboard</title>
+    <title>Data Labeler - Admin Audit Dashboard (DEPRECATED)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -306,7 +312,7 @@
         </section>
     </main>
 
-    <footer class="text-center pb-8 mt-4 text-[11px] text-slate-500 font-medium tracking-wide z-10">&copy; 2026 &bull; Tim BDC Satria Data Universitas Jambi</footer>
+    <footer class="text-center pb-8 mt-4 text-[11px] text-slate-500 font-medium tracking-wide z-10">&copy; 2026 &bull; Tim DATASCAPE 2026 Polban</footer>
 
     <script>
         function updateFileName(input, targetId) {

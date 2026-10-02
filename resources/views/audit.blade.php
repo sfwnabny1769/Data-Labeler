@@ -36,6 +36,7 @@
         ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
         button:disabled { opacity: 0.35; cursor: not-allowed; }
     </style>
+@include('partials.neo')
 </head>
 <body class="min-h-screen text-slate-100 flex flex-col relative pb-8">
 
@@ -53,7 +54,14 @@
             </div>
             <div>
                 <span class="font-outfit font-bold text-lg tracking-tight bg-gradient-to-r from-amber-200 to-red-200 bg-clip-text text-transparent">Data Labeler</span>
-                <span class="text-[10px] uppercase font-bold tracking-widest text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded ml-2">Audit Label -- Putaran 1</span>
+                @php
+                    $auditLabel = match($activeActivity ?? 'audit') {
+                        'preprocess' => 'Fase 0 — Audit Train Set',
+                        'audit' => 'Fase 2 — Audit Hasil Labeling',
+                        default => 'Audit Label',
+                    };
+                @endphp
+                <span class="text-[10px] uppercase font-bold tracking-widest text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded ml-2">{{ $auditLabel }}</span>
             </div>
         </div>
         <div class="flex items-center gap-4">
@@ -145,12 +153,13 @@
             <!-- Relabel Options (Inline Putaran 2) -->
             <div id="relabel-options" class="hidden w-full p-5 bg-amber-500/5 border border-amber-500/20 rounded-2xl mb-4 text-center">
                 <p class="text-xs font-bold text-amber-300 uppercase tracking-wider mb-3">Tentukan Kelas Tujuan yang Benar</p>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <button onclick="submitDecisionWithClass('0_Recyclable')" class="py-2.5 px-4 bg-slate-900/80 hover:bg-amber-500/10 border border-slate-800 hover:border-amber-500/40 rounded-xl text-xs font-bold text-slate-200 transition-all active:scale-95">0_Recyclable</button>
-                    <button onclick="submitDecisionWithClass('1_Electronic')" class="py-2.5 px-4 bg-slate-900/80 hover:bg-amber-500/10 border border-slate-800 hover:border-amber-500/40 rounded-xl text-xs font-bold text-slate-200 transition-all active:scale-95">1_Electronic</button>
-                    <button onclick="submitDecisionWithClass('2_Organic')" class="py-2.5 px-4 bg-slate-900/80 hover:bg-amber-500/10 border border-slate-800 hover:border-amber-500/40 rounded-xl text-xs font-bold text-slate-200 transition-all active:scale-95">2_Organic</button>
+                <div class="grid grid-cols-1 sm:grid-cols-{{ count($classOptions) }} gap-3">
+                    @foreach($classOptions as $key => $label)
+                    <button onclick="submitDecisionWithClass('{{ $key }}')" class="py-2.5 px-4 bg-slate-900/80 hover:bg-amber-500/10 border border-slate-800 hover:border-amber-500/40 rounded-xl text-xs font-bold text-slate-200 transition-all active:scale-95">{{ $key }}</button>
+                    @endforeach
                 </div>
-                <button onclick="cancelRelabelChoice()" class="mt-4 text-[10px] text-slate-400 hover:underline">Batal</button>
+                <p class="mt-3 text-[10px] text-slate-400">{{ implode(' · ', array_values($classOptions)) }}</p>
+                <button onclick="cancelRelabelChoice()" class="mt-3 text-[10px] text-slate-400 hover:underline">Batal</button>
             </div>
 
             <div id="decision-controls" class="w-full">
@@ -167,6 +176,7 @@
             </div>
 
             <div id="reveal-box" class="hidden w-full mt-4 p-4 bg-indigo-500/10 border border-indigo-500/25 rounded-2xl text-center">
+                <div id="decision-badge" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold mb-3"></div>
                 <p class="text-xs text-slate-400">Prediksi model: <b id="reveal-pred" class="text-indigo-300"></b> (skor: <span id="reveal-score" class="text-indigo-300"></span>)</p>
                 <button onclick="fetchNext()" class="mt-3 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-all">Lanjut &rarr;</button>
             </div>
@@ -175,7 +185,7 @@
         <p class="text-center text-[11px] text-slate-500">Shortcut keyboard: <kbd class="bg-slate-800 px-1.5 py-0.5 rounded">A</kbd> <kbd class="bg-slate-800 px-1.5 py-0.5 rounded">B</kbd> <kbd class="bg-slate-800 px-1.5 py-0.5 rounded">C</kbd> <kbd class="bg-slate-800 px-1.5 py-0.5 rounded">D</kbd> untuk memutuskan, <kbd class="bg-slate-800 px-1.5 py-0.5 rounded">Enter</kbd> untuk lanjut.</p>
     </main>
 
-    <footer class="text-center pb-8 mt-4 text-[11px] text-slate-500 font-medium tracking-wide z-10">&copy; 2026 &bull; Tim BDC Satria Data Universitas Jambi</footer>
+    <footer class="text-center pb-8 mt-4 text-[11px] text-slate-500 font-medium tracking-wide z-10">&copy; 2026 &bull; Tim DATASCAPE 2026 Polban</footer>
 
     <script>
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
@@ -287,6 +297,9 @@
                     document.getElementById('decision-controls').classList.remove('hidden');
                     document.getElementById('crop-trigger-container').classList.remove('hidden');
                     
+                    // Badge konfirmasi visual untuk keputusan
+                    setDecisionBadge(decision, relabelTo);
+                    
                     document.getElementById('reveal-pred').textContent = data.predicted_label ?? '-';
                     document.getElementById('reveal-score').textContent = data.label_quality_score != null ? Number(data.label_quality_score).toFixed(4) : '-';
                     document.getElementById('reveal-box').classList.remove('hidden');
@@ -296,6 +309,7 @@
                     document.getElementById('decision-controls').classList.remove('opacity-30', 'pointer-events-none', 'hidden');
                     document.getElementById('crop-trigger-container').classList.remove('hidden');
                     document.getElementById('relabel-options').classList.add('hidden');
+                    document.getElementById('reveal-box').classList.add('hidden');
                     
                     if (err.response && err.response.status === 409) {
                         showAlert(err.response.data.error, 'warning');
@@ -304,6 +318,29 @@
                         showAlert('Gagal mengirim keputusan. Coba lagi.', 'danger');
                     }
                 });
+        }
+
+        // Badge konfirmasi: "Ditandai sebagai ..." sesuai decision A/B/C/D
+        const DECISION_BADGES = {
+            'A': { label: 'Salah Label', bg: 'bg-amber-500/15', border: 'border-amber-500/35', text: 'text-amber-300' },
+            'B': { label: 'Kontaminasi', bg: 'bg-red-500/15', border: 'border-red-500/35', text: 'text-red-300' },
+            'C': { label: 'Ambigu', bg: 'bg-indigo-500/15', border: 'border-indigo-500/35', text: 'text-indigo-300' },
+            'D': { label: 'Model Error', bg: 'bg-emerald-500/15', border: 'border-emerald-500/35', text: 'text-emerald-300' },
+        };
+
+        function setDecisionBadge(decision, relabelTo) {
+            const badge = document.getElementById('decision-badge');
+            const info = DECISION_BADGES[decision];
+            if (!info) { badge.classList.add('hidden'); return; }
+
+            badge.classList.remove('hidden', 'bg-amber-500/15', 'border-amber-500/35', 'text-amber-300', 'bg-red-500/15', 'border-red-500/35', 'text-red-300', 'bg-indigo-500/15', 'border-indigo-500/35', 'text-indigo-300', 'bg-emerald-500/15', 'border-emerald-500/35', 'text-emerald-300');
+            badge.classList.add(info.bg, info.border, info.text);
+
+            let text = 'Ditandai sebagai ' + info.label;
+            if (decision === 'A' && relabelTo) {
+                text += ' &rarr; ' + relabelTo;
+            }
+            badge.innerHTML = text;
         }
 
         // ==========================================
